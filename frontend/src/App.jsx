@@ -68,7 +68,7 @@ export default function App() {
                         onError={showError}
                     />
                 ) : state.settings.cameras.length === 0 ? (
-                    <Welcome onAdd={() => setView({ name: 'settings', adding: true })} />
+                    <Welcome onAdd={() => setView({ name: 'settings', adding: true })} onError={showError} />
                 ) : (
                     <ControlView state={state} onError={showError} />
                 )}
@@ -103,7 +103,11 @@ function AtemBadge({ atem, configured }) {
     );
 }
 
-function Welcome({ onAdd }) {
+function Welcome({ onAdd, onError }) {
+    async function load() {
+        const out = await window.ptz.importSettings();
+        if (!out?.ok && !out?.canceled) onError(out?.message || 'Could not load the settings.');
+    }
     return (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
             <Video size={48} className="text-zinc-600" />
@@ -117,6 +121,9 @@ function Welcome({ onAdd }) {
                 className="rounded-lg bg-accent px-4 py-2 font-semibold text-zinc-900 hover:bg-sky-200"
             >
                 Add a camera
+            </button>
+            <button type="button" onClick={load} className="text-sm text-zinc-400 underline-offset-4 hover:text-zinc-200 hover:underline">
+                Or load settings saved on another computer
             </button>
         </div>
     );

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { statusOf } from './status.js';
 import AtemSettings from './AtemSettings.jsx';
+import SupportSettings from './SupportSettings.jsx';
 
 const MODE_LABELS = {
     'udp-sony': 'UDP with Sony header',
@@ -11,6 +12,7 @@ const MODE_LABELS = {
 };
 
 export default function SettingsView({ state, startAdding, onBack, onError }) {
+    const onInfo = (message) => onError(message, 'info');
     const { settings, statuses, profiles, video, atem } = state;
     // null = list, 'new' = adding, otherwise the id of the camera being edited
     const [form, setForm] = useState(startAdding ? 'new' : null);
@@ -113,6 +115,7 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                         </div>
                     )}
                     <AtemSettings atemSettings={settings.atem} atem={atem} cameras={settings.cameras} onError={onError} />
+                    <SupportSettings cameras={settings.cameras} version={state.version} onError={onError} onInfo={onInfo} />
                 </>
             )}
         </div>

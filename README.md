@@ -8,6 +8,9 @@ speaks standard VISCA over IP.
 Works on Windows and Mac. Cameras are added in the app, so the same install
 works at any temple with any number of cameras.
 
+**To install it**, download the installer for your computer from the
+project's Releases page and follow [docs/SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+
 The full plan is in [PLAN.md](PLAN.md). Phases 1 to 5 are built: adding
 cameras, moving them, saved shots, live video from each camera, the optional
 ATEM link, exposure and white balance, camera power, and turning auto
@@ -55,6 +58,32 @@ the ATEM.
 Safety: every camera is told to stop whenever the app window loses focus, the
 window stops responding, or the app closes. A held control also has to keep
 checking in; if it stops doing that for 1.5 seconds the camera is stopped.
+
+Backup: Settings, Backup, **Save settings to a file** keeps every camera,
+shot (with its picture) and ATEM setting in one file. **Load settings from a
+file** (also offered on the welcome screen) sets up another computer the same
+way.
+
+## Building the installers
+
+Installers are built on GitHub's own Windows and Mac machines by
+`.github/workflows/build-installers.yml`. In the repository's **Actions** tab,
+choose **Build installers**, then **Run workflow**. When it finishes, the
+Windows installer and the two Mac disk images are under **Artifacts** on that
+run. Pushing a version tag such as `v0.9.0` builds them too and attaches them
+to a GitHub Release.
+
+To build on your own computer instead:
+
+```bash
+npm run dist:win
+```
+
+```bash
+npm run dist:mac
+```
+
+Output goes to `release/`. A Mac is needed for the Mac build.
 
 ## Running from source
 
@@ -122,12 +151,15 @@ src/main/profiles/       Camera models (BZB ADAMO, generic VISCA)
 src/main/cameras/        One connection per camera; joystick rate limit and watchdog
 src/main/video/          RTSP client and H.264 unpacking for the video
 src/main/atem/           ATEM connection, LIVE/NEXT calculation, tally lights
-src/main/store/          Settings file, the rules for cameras and shots, shot pictures
+src/main/store/          Settings file, rules for cameras and shots, shot pictures, backup
+src/main/tools/          Camera web page recorder (Settings, Record a camera's web page)
 frontend/src/            The window (React)
 sim/fake-camera.js       Pretend camera for tests and trying the app
 sim/fake-rtsp.js         Pretend camera video stream (loops sim/assets/test-pattern.h264)
 sim/fake-atem.js         Pretend ATEM for the app tests (PTZ_FAKE_ATEM=1)
 tests/                   Unit and network tests (node --test)
 e2e/                     Tests that drive the real app window
-docs/                    On-site checklist
+docs/                    Setup guide for new temples, on-site checklist
+build/icon.png           App icon (the installers make the Windows and Mac icons from it)
+.github/workflows/       CI (tests on every push) and the installer builds
 ```

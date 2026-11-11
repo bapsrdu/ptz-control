@@ -351,8 +351,11 @@ control once including Track Configuration, and export the log into `docs/`.
 
 ### Phase 6: web-page-only features
 
-Using the HAR file, add tracking mode, headroom, zone setup, "tracking lost"
-preset and picture style to the BZB profile. If the camera requires a login
+Using a recording of the camera's web page (Settings, Record a camera's web
+page; Chrome HAR exports came out empty at Raleigh), add tracking mode,
+headroom, zone setup, "tracking lost" preset and picture style to the BZB
+profile. The camera's web page has a WebSocket on port 8088 (manual, Network
+Port), which is the likely channel for these. If the camera requires a login
 for these calls, add username and password fields to the camera and store the
 password with Electron `safeStorage`, not in the JSON file.
 
@@ -375,11 +378,24 @@ services.
 - Expect several services' worth of tuning. The sub stream is small and has
   delay, so this will react more slowly than the camera's own tracker.
 
-### Phase 8: packaging and hand-out
+### Phase 8: packaging and hand-out (built)
 
-Installers for Windows and Mac, an app icon, export/import of settings, a
-first-run screen that leads straight to "Add a camera", and a short setup
-guide for other temples covering fixed camera addresses and the Test button.
+- `electron-builder` settings in `package.json`: a Windows installer
+  (`PTZ-Control-Setup-<version>.exe`, per-user, no admin rights needed) and
+  Mac disk images for Apple Silicon and Intel. Not code-signed; the setup
+  guide explains the first-run warnings.
+- `.github/workflows/build-installers.yml` builds both on GitHub's Windows and
+  Mac machines, from the Actions tab or a `v*` tag (which also makes a
+  Release). Unit tests run first.
+- The packaged app was checked on Linux by `e2e/packaged.test.js`: cameras,
+  video, movement and the ATEM library all work from inside the package.
+- App icon in `build/icon.png`.
+- Settings backup: save everything (including shot pictures) to one file, and
+  load it on another computer, also from the welcome screen.
+- App version shown in Settings.
+- `docs/SETUP-GUIDE.md` for other temples.
+- Camera web page recorder (Settings), a stand-in for Chrome's HAR export
+  that also captures WebSocket messages. Its file feeds phase 6.
 
 ## 8. Rules for the builder
 

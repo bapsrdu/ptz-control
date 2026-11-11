@@ -1,0 +1,72 @@
+name: Build installers
+
+# Builds the Windows installer and the Mac disk images on GitHub's own Windows
+# and Mac machines, so nobody needs a Mac or a Windows build PC.
+#
+# Run it from the Actions tab (Build installers, Run workflow), or push a
+# version tag such as v0.9.0 to also attach the installers to a GitHub Release.
+#
+# The installers are not code-signed (that needs paid Apple and Windows
+# certificates). Windows shows a SmartScreen warning on first run (More info,
+# Run anyway); on a Mac, right-click the app and choose Open the first time.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # only used by the Release step on tag pushes
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            dist: dist:win
+            files: |
+              release/*.exe
+          - os: macos-latest
+            dist: dist:mac
+            files: |
+              release/*.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # A broken commit must not become an installer.
+      - name: Unit tests
+        run: npm test
+
+      - name: Build installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false" # no signing certificate
+        run: npm run ${{ matrix.dist }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ matrix.files }}
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.files }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true

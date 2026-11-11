@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld('ptz', {
     setAtem: invoke('atem:set'),
     lowerThirds: invoke('atem:lowerThirds'),
 
+    // Backup and support tools
+    exportSettings: invoke('settings:export'),
+    importSettings: invoke('settings:import'),
+    recordWebPage: invoke('tools:recordWebPage'),
+
     // Screen preferences: { speed, selectedCameraId }
     setUi: invoke('ui:set'),
 

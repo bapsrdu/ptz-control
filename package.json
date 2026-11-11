@@ -1,7 +1,7 @@
 {
   "name": "ptz-control",
   "productName": "PTZ Control",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Simple PTZ camera control for temple AV volunteers",
   "main": "main.js",
   "type": "module",
@@ -17,28 +17,93 @@
     "sim": "node sim/fake-camera.js",
     "test": "node --test --test-timeout=20000 tests/*.test.js",
     "test:e2e": "npm run build:renderer && node --test --test-timeout=60000 e2e/*.test.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "dist:win": "npm run build:renderer && electron-builder --win --publish never",
+    "dist:mac": "npm run build:renderer && electron-builder --mac --publish never",
+    "dist:linux": "npm run build:renderer && electron-builder --linux dir --publish never"
   },
   "dependencies": {
-    "atem-connection": "^3.10.3",
-    "lucide-react": "^1.72.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "atem-connection": "^3.10.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.5",
     "@vitejs/plugin-react": "^6.3.0",
     "electron": "^41.10.7",
+    "electron-builder": "^26.18.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.14.0",
+    "lucide-react": "^1.72.0",
     "playwright-core": "^1.56.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.5",
     "vite": "^8.3.8"
   },
   "allowScripts": {
     "electron": true
+  },
+  "author": "PTZ Control contributors",
+  "build": {
+    "appId": "app.ptzcontrol",
+    "productName": "PTZ Control",
+    "copyright": "PTZ Control contributors",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "package.json",
+      "src/**/*",
+      "dist-renderer/**/*",
+      "sim/fake-atem.js"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.video",
+      "artifactName": "PTZ-Control-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "PTZ Control ${version}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "PTZ-Control-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PTZ Control"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Video"
+    }
   }
 }

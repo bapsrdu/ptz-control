@@ -117,10 +117,15 @@ On the controls:
 
 ### For phase 6
 
-- [ ] Open one camera's web page in Chrome. Open DevTools (F12) on the Network
-      tab, tick "Preserve log", then use every control once, including Track
-      Configuration (tracking mode, headroom, zones). Right-click the request
-      list, choose "Save all as HAR", and add the file to `docs/` here.
+Chrome's HAR export came out empty, so the app has its own recorder.
+
+- [ ] In the app: Settings, "Record a camera's web page". Pick one BZB camera
+      and press **Open and record**. The camera's page opens in a new window.
+- [ ] Log in. Then use each of these once: Track Configuration (tracking
+      On/Off, Presenter and Zone, each Headroom setting, set a zone, the
+      Tracking Lost Preset), and Image Style if there is one.
+- [ ] Close the camera window. Save the file, and send it. It includes the
+      camera login, so change the camera password afterwards if that matters.
 
 ### Results
 

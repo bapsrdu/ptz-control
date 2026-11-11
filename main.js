@@ -1,7 +1,7 @@
 // Electron main process: owns the settings file and every camera connection,
 // and answers the window's requests over IPC (see preload.cjs).
 
-import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, dialog } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,6 +11,8 @@ import { detectMode } from './src/main/visca/detect.js';
 import { describeProfiles, videoUrlFor, getProfile } from './src/main/profiles/index.js';
 import { VideoService } from './src/main/video/service.js';
 import { ShotImages } from './src/main/store/shot-images.js';
+import { buildBackup, readBackup, replaceSettings } from './src/main/store/backup.js';
+import { recordWebPage, countRecording } from './src/main/tools/web-recorder.js';
 import { AtemLink } from './src/main/atem/link.js';
 import { computeOnAir, keyerState } from './src/main/atem/tally.js';
 import { TallySync } from './src/main/atem/tally-sync.js';
@@ -65,6 +67,7 @@ function snapshot() {
         video: video.statuses(),
         atem: atemView,
         profiles: describeProfiles(),
+        version: app.getVersion(),
     };
 }
 
@@ -338,6 +341,75 @@ ipcMain.handle('preset:delete', async (_e, cameraId, presetId) => {
     const out = store.apply(S.removePreset, cameraId, presetId);
     if (out.ok) shotImages.remove(presetId);
     return out.ok ? { ok: true } : { ok: false, message: Object.values(out.errors)[0] };
+});
+
+// --- Backup, and the camera web page recorder ---------------------------------
+
+const dateStamp = () => new Date().toISOString().slice(0, 10);
+
+ipcMain.handle('settings:export', async () => {
+    const res = await dialog.showSaveDialog(win, {
+        title: 'Save PTZ Control settings',
+        defaultPath: path.join(app.getPath('documents'), `PTZ Control settings ${dateStamp()}.json`),
+        filters: [{ name: 'PTZ Control settings', extensions: ['json'] }],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    try {
+        const backup = buildBackup({ settings: store.get(), version: app.getVersion(), shotImages });
+        fs.writeFileSync(res.filePath, JSON.stringify(backup, null, 2));
+        return { ok: true, path: res.filePath };
+    } catch (err) {
+        return { ok: false, message: `Could not save the file: ${err.message}` };
+    }
+});
+
+ipcMain.handle('settings:import', async () => {
+    const res = await dialog.showOpenDialog(win, {
+        title: 'Load PTZ Control settings',
+        properties: ['openFile'],
+        filters: [{ name: 'PTZ Control settings', extensions: ['json'] }],
+    });
+    if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
+    let text;
+    try {
+        text = fs.readFileSync(res.filePaths[0], 'utf8');
+    } catch (err) {
+        return { ok: false, message: `Could not open the file: ${err.message}` };
+    }
+    const backup = readBackup(text);
+    if (!backup.ok) return backup;
+    await manager.stopAll();
+    for (const [presetId, b64] of Object.entries(backup.pictures)) {
+        shotImages.save(presetId, `data:image/jpeg;base64,${b64}`);
+    }
+    store.apply(replaceSettings, backup.settings);
+    return { ok: true, cameras: backup.settings.cameras.length };
+});
+
+ipcMain.handle('tools:recordWebPage', async (_e, cameraId) => {
+    const cam = camera(cameraId);
+    if (!cam) return unknownCamera;
+    // PTZ_WEB_PORT is for the tests, which cannot use port 80.
+    const port = process.env.PTZ_WEB_PORT ? `:${Number(process.env.PTZ_WEB_PORT)}` : '';
+    const result = await recordWebPage({ url: `http://${cam.host}${port}/`, parent: win, title: `${cam.name} (${cam.host})` });
+    if (!result.ok) return result;
+    const counts = countRecording(result.recording);
+    if (!result.recording.entries.length) {
+        return { ok: false, message: 'Nothing was recorded. Check the camera page opened, then try again.' };
+    }
+    const safeName = cam.name.replace(/[^\w -]+/g, '').trim() || 'camera';
+    const res = await dialog.showSaveDialog(win, {
+        title: 'Save the camera web page recording',
+        defaultPath: path.join(app.getPath('downloads'), `${safeName} web recording ${dateStamp()}.json`),
+        filters: [{ name: 'Recording', extensions: ['json'] }],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    try {
+        fs.writeFileSync(res.filePath, JSON.stringify(result.recording, null, 2));
+        return { ok: true, path: res.filePath, ...counts };
+    } catch (err) {
+        return { ok: false, message: `Could not save the recording: ${err.message}` };
+    }
 });
 
 // --- Window -----------------------------------------------------------------
