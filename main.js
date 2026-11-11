@@ -405,10 +405,11 @@ ipcMain.handle('tools:recordWebPage', async (_e, cameraId) => {
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     try {
-        fs.writeFileSync(res.filePath, JSON.stringify(result.recording, null, 2));
+        // No indentation: recordings can be large, and this keeps them small.
+        fs.writeFileSync(res.filePath, JSON.stringify(result.recording));
         return { ok: true, path: res.filePath, ...counts };
     } catch (err) {
-        return { ok: false, message: `Could not save the recording: ${err.message}` };
+        return { ok: false, message: `Could not save the recording (${err.message}). Try a shorter recording: open the page, use each setting once, and close it.` };
     }
 });
 

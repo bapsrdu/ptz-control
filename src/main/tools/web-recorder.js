@@ -12,6 +12,17 @@ import { BrowserWindow } from 'electron';
 const MAX_BODY = 256 * 1024;
 const TEXT_TYPES = /json|text|javascript|xml|html|x-www-form-urlencoded/i;
 
+// The camera page streams its live preview over the same WebSocket as its
+// commands, which is hundreds of megabytes over a few minutes. Keep every
+// text message (the commands) in full up to MAX_TEXT_FRAME, but only count
+// binary frames (the video), keeping a short sample of the first few so the
+// format can still be recognised.
+const MAX_TEXT_FRAME = 16 * 1024;
+const MAX_FRAMES_PER_SOCKET = 20000;
+const BINARY_SAMPLES = 5;
+const BINARY_SAMPLE_CHARS = 200;
+const MAX_HTTP_ENTRIES = 20000;
+
 export function recordWebPage({ url, parent, title = 'Camera web page' }) {
     return new Promise((resolve) => {
         const win = new BrowserWindow({
@@ -32,6 +43,8 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
 
         const startedAt = Date.now();
         const entries = [];
+        let httpCount = 0;
+        let skippedHttp = 0;
         const requests = new Map(); // requestId -> entry
         const sockets = new Map(); // requestId -> entry
         const dbg = win.webContents.debugger;
@@ -41,6 +54,11 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
             try {
                 switch (method) {
                     case 'Network.requestWillBeSent': {
+                        if (httpCount >= MAX_HTTP_ENTRIES) {
+                            skippedHttp += 1;
+                            break;
+                        }
+                        httpCount += 1;
                         const entry = {
                             type: 'http',
                             t: at(),
@@ -72,7 +90,14 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
                         break;
                     }
                     case 'Network.webSocketCreated': {
-                        const entry = { type: 'websocket', t: at(), url: params.url, frames: [] };
+                        const entry = {
+                            type: 'websocket',
+                            t: at(),
+                            url: params.url,
+                            frames: [],
+                            binaryFrames: { sent: 0, received: 0, bytes: 0 },
+                            droppedTextFrames: 0,
+                        };
                         sockets.set(params.requestId, entry);
                         entries.push(entry);
                         break;
@@ -80,13 +105,26 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
                     case 'Network.webSocketFrameSent':
                     case 'Network.webSocketFrameReceived': {
                         const entry = sockets.get(params.requestId);
-                        if (entry) {
-                            entry.frames.push({
-                                t: at(),
-                                dir: method.endsWith('Sent') ? 'sent' : 'received',
-                                opcode: params.response.opcode,
-                                data: params.response.payloadData,
-                            });
+                        if (!entry) break;
+                        const dir = method.endsWith('Sent') ? 'sent' : 'received';
+                        const { opcode, payloadData = '' } = params.response;
+                        if (opcode === 1) {
+                            if (entry.frames.length >= MAX_FRAMES_PER_SOCKET) {
+                                entry.droppedTextFrames += 1;
+                                break;
+                            }
+                            const data = payloadData.length > MAX_TEXT_FRAME
+                                ? `${payloadData.slice(0, MAX_TEXT_FRAME)}... (cut, ${payloadData.length} characters)`
+                                : payloadData;
+                            entry.frames.push({ t: at(), dir, opcode, data });
+                        } else {
+                            // Binary (video). Chromium gives it as base64.
+                            entry.binaryFrames[dir] += 1;
+                            entry.binaryFrames.bytes += Math.floor((payloadData.length * 3) / 4);
+                            const samples = entry.frames.filter((f) => f.opcode !== 1).length;
+                            if (samples < BINARY_SAMPLES && entry.frames.length < MAX_FRAMES_PER_SOCKET) {
+                                entry.frames.push({ t: at(), dir, opcode, base64Start: payloadData.slice(0, BINARY_SAMPLE_CHARS), length: Math.floor((payloadData.length * 3) / 4) });
+                            }
                         }
                         break;
                     }
@@ -122,6 +160,7 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
                     url,
                     startedAt: new Date(startedAt).toISOString(),
                     durationMs: at(),
+                    skippedHttpRequests: skippedHttp,
                     entries,
                 },
             });
@@ -141,6 +180,8 @@ export function recordWebPage({ url, parent, title = 'Camera web page' }) {
 
 export function countRecording(recording) {
     const http = recording.entries.filter((e) => e.type === 'http').length;
-    const frames = recording.entries.filter((e) => e.type === 'websocket').reduce((n, e) => n + e.frames.length, 0);
-    return { http, frames };
+    const sockets = recording.entries.filter((e) => e.type === 'websocket');
+    const frames = sockets.reduce((n, e) => n + e.frames.filter((f) => f.opcode === 1).length, 0);
+    const videoFrames = sockets.reduce((n, e) => n + e.binaryFrames.sent + e.binaryFrames.received, 0);
+    return { http, frames, videoFrames };
 }

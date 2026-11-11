@@ -24,7 +24,7 @@ export default function SupportSettings({ cameras, version, onError, onInfo }) {
         setRecording(true);
         const out = await window.ptz.recordWebPage(cameraId);
         setRecording(false);
-        if (out?.ok) onInfo(`Recording saved to ${out.path} (${out.http} requests, ${out.frames} WebSocket messages).`);
+        if (out?.ok) onInfo(`Recording saved to ${out.path} (${out.http} requests, ${out.frames} WebSocket messages${out.videoFrames ? `, ${out.videoFrames} video frames counted but not kept` : ''}).`);
         else if (!out?.canceled) onError(out?.message || 'The recording was not saved.');
     }
 

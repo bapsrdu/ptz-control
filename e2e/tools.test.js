@@ -93,6 +93,8 @@ test('settings and shot pictures go to a file and back onto a new computer', asy
 
 function fakeWebPage() {
     const wsMessages = [];
+    let resolveVideo;
+    const videoDone = { promise: new Promise((r) => { resolveVideo = r; }), resolve: () => resolveVideo() };
     const server = http.createServer((req, res) => {
         if (req.url === '/') {
             res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -121,10 +123,21 @@ function fakeWebPage() {
             wsMessages.push(data);
             const reply = Buffer.from('{"result":"ok"}');
             socket.write(Buffer.concat([Buffer.from([0x81, reply.length]), reply]));
+            // Then stream "video" like the BZB page does: 300 binary frames of
+            // 60 KB (18 MB), which must be counted, not kept.
+            const video = Buffer.alloc(60000, 0x42);
+            const head = Buffer.from([0x82, 126, (video.length >> 8) & 0xff, video.length & 0xff]);
+            let sent = 0;
+            const pump = () => {
+                while (sent < 300 && socket.write(Buffer.concat([head, video]))) sent += 1;
+                if (sent < 300) socket.once('drain', () => { sent += 1; pump(); });
+                else videoDone.resolve();
+            };
+            pump();
         });
         socket.on('error', () => {});
     });
-    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, wsMessages })));
+    return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, wsMessages, videoDone: videoDone.promise })));
 }
 
 test('records a camera web page, including WebSocket messages', async (t) => {
@@ -142,7 +155,8 @@ test('records a camera web page, including WebSocket messages', async (t) => {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Open and record' }).click();
     await until(() => web.wsMessages.length > 0, 'the camera page to talk over its WebSocket');
-    await page.waitForTimeout(300);
+    await web.videoDone;
+    await page.waitForTimeout(800);
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.getTitle().startsWith('Recording')).close());
     await page.getByRole('status').getByText('Recording saved to').waitFor();
 
@@ -154,8 +168,12 @@ test('records a camera web page, including WebSocket messages', async (t) => {
     assert.equal(cgi.responseBody, '{"tracking":"on","mode":"presenter"}');
     const ws = rec.entries.find((e) => e.type === 'websocket');
     assert.ok(ws, 'WebSocket recorded');
-    assert.deepEqual(ws.frames.map((f) => [f.dir, f.data]), [
+    assert.deepEqual(ws.frames.filter((f) => f.opcode === 1).map((f) => [f.dir, f.data]), [
         ['sent', '{"cmd":"track","mode":"presenter"}'],
         ['received', '{"result":"ok"}'],
     ]);
+    // Video frames are counted, with only a few short samples kept.
+    assert.ok(ws.binaryFrames.received >= 250, `counted ${ws.binaryFrames.received} video frames`);
+    assert.ok(ws.frames.filter((f) => f.opcode !== 1).length <= 5);
+    assert.ok(fs.statSync(file).size < 200 * 1024, `recording is ${fs.statSync(file).size} bytes`);
 });
