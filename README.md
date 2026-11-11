@@ -8,9 +8,9 @@ speaks standard VISCA over IP.
 Works on Windows and Mac. Cameras are added in the app, so the same install
 works at any temple with any number of cameras.
 
-The full plan is in [PLAN.md](PLAN.md). Phases 1 to 3 are built: adding
-cameras, moving them, saved shots, and live video from each camera. The ATEM
-link comes next.
+The full plan is in [PLAN.md](PLAN.md). Phases 1 to 4 are built: adding
+cameras, moving them, saved shots, live video from each camera, and the
+optional ATEM link.
 
 ## Using it
 
@@ -35,6 +35,13 @@ cameras this is the camera's sub stream, `rtsp://<IP>:554/live/av1`, found
 automatically. For other cameras, or if the camera asks for a login, enter the
 video address in the camera's settings, for example
 `rtsp://admin:password@192.168.1.50:554/live/av1`. The stream must be H.264.
+
+With an ATEM switcher (optional, set up under **Settings**): tiles show which
+camera is LIVE and which is NEXT, a Live view shows what is on air, the
+cameras' tally lights follow the switcher, a live camera's controls stay
+locked until you press **Allow moving**, and a **Lower thirds** button turns
+the lower-thirds key on and off. The app never switches cameras; that stays on
+the ATEM.
 
 Safety: every camera is told to stop whenever the app window loses focus, the
 window stops responding, or the app closes. A held control also has to keep
@@ -105,10 +112,12 @@ src/main/visca/          VISCA commands, framing, transports, client, auto-detec
 src/main/profiles/       Camera models (BZB ADAMO, generic VISCA)
 src/main/cameras/        One connection per camera; joystick rate limit and watchdog
 src/main/video/          RTSP client and H.264 unpacking for the video
+src/main/atem/           ATEM connection, LIVE/NEXT calculation, tally lights
 src/main/store/          Settings file, the rules for cameras and shots, shot pictures
 frontend/src/            The window (React)
 sim/fake-camera.js       Pretend camera for tests and trying the app
 sim/fake-rtsp.js         Pretend camera video stream (loops sim/assets/test-pattern.h264)
+sim/fake-atem.js         Pretend ATEM for the app tests (PTZ_FAKE_ATEM=1)
 tests/                   Unit and network tests (node --test)
 e2e/                     Tests that drive the real app window
 docs/                    On-site checklist

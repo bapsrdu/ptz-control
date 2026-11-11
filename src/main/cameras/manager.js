@@ -249,6 +249,19 @@ export class CameraManager extends EventEmitter {
         return this.#send(entry, entry.profile.trackingCommand(ADDRESS, on));
     }
 
+    // Tally lights. red/green: true on, false off. Cameras without tally
+    // lights ignore this.
+    async tally(id, { red, green }) {
+        const entry = this.#entry(id);
+        if (!entry?.profile.tallyCommands) return { ok: false, message: 'This camera has no tally lights.' };
+        const [redCmd, greenCmd] = entry.profile.tallyCommands(ADDRESS, { red, green });
+        const results = await Promise.all([
+            this.#send(entry, redCmd, { key: 'tally-red' }),
+            this.#send(entry, greenCmd, { key: 'tally-green' }),
+        ]);
+        return results.find((r) => !r.ok) ?? { ok: true };
+    }
+
     async dispose() {
         await this.stopAll();
         for (const entry of this.entries.values()) {

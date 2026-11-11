@@ -8,9 +8,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as S from './src/main/store/settings.js';
 import { CameraManager } from './src/main/cameras/manager.js';
 import { detectMode } from './src/main/visca/detect.js';
-import { describeProfiles, videoUrlFor } from './src/main/profiles/index.js';
+import { describeProfiles, videoUrlFor, getProfile } from './src/main/profiles/index.js';
 import { VideoService } from './src/main/video/service.js';
 import { ShotImages } from './src/main/store/shot-images.js';
+import { AtemLink } from './src/main/atem/link.js';
+import { computeOnAir, keyerState } from './src/main/atem/tally.js';
+import { TallySync } from './src/main/atem/tally-sync.js';
+
+// Tests run the app against a pretend switcher.
+let createAtem;
+if (process.env.PTZ_FAKE_ATEM) {
+    const { FakeAtem } = await import('./sim/fake-atem.js');
+    createAtem = () => (globalThis.ptzFakeAtem = new FakeAtem());
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +51,7 @@ let win = null;
 const store = new S.SettingsStore(app.getPath('userData'));
 const shotImages = new ShotImages(app.getPath('userData'));
 const video = new VideoService();
+const atem = new AtemLink({ createAtem });
 const tracking = new Map(); // cameraId -> last tracking state set from this app
 const manager = new CameraManager({
     onModeDetected: (id, mode) => store.apply(S.setCameraMode, id, mode),
@@ -52,6 +63,7 @@ function snapshot() {
         statuses: manager.statuses(),
         tracking: Object.fromEntries(tracking),
         video: video.statuses(),
+        atem: atemView,
         profiles: describeProfiles(),
     };
 }
@@ -70,15 +82,61 @@ function syncVideo(cameras) {
     video.sync(cameras.map((c) => ({ id: c.id, url: videoUrlFor(c) })));
 }
 
+// --- ATEM: what is live, tally lights, lower thirds ---------------------------
+
+let atemView = { status: atem.status, summary: null, live: [], next: [], liveInputs: [], lowerThirds: null };
+let atemSummary = null;
+const tallySync = new TallySync(manager);
+
+function refreshAtem({ summary = false } = {}) {
+    const settings = store.get();
+    const state = atem.state;
+    if (summary || !atemSummary) atemSummary = atem.summary();
+    if (!state) atemSummary = null;
+    const { live, next } = computeOnAir(state, settings.atem.watched);
+    const cameras = settings.cameras;
+    atemView = {
+        status: atem.status,
+        summary: atemSummary,
+        live: cameras.filter((c) => c.atemInput && live.has(c.atemInput)).map((c) => c.id),
+        next: cameras.filter((c) => c.atemInput && next.has(c.atemInput)).map((c) => c.id),
+        liveInputs: [...live].sort((a, b) => a - b),
+        lowerThirds: settings.atem.lowerThirds ? keyerState(state, settings.atem.lowerThirds) : null,
+    };
+
+    // Tally lights. Leave them alone entirely if no ATEM is set up.
+    const wanted = new Map();
+    if (settings.atem.host) {
+        const follow = settings.atem.tally && atem.connected;
+        for (const c of cameras) {
+            if (!getProfile(c.profile).features.tally) continue;
+            const colour = !follow ? 'off' : atemView.live.includes(c.id) ? 'red' : atemView.next.includes(c.id) ? 'green' : 'off';
+            wanted.set(c.id, colour);
+        }
+    }
+    tallySync.update(wanted);
+    pushState();
+}
+
+atem.on('status', () => refreshAtem({ summary: true }));
+atem.on('change', () => refreshAtem({ summary: true }));
+
 store.on('change', (settings) => {
     manager.sync(settings.cameras);
     syncVideo(settings.cameras);
+    atem.configure(settings.atem);
+    refreshAtem();
     for (const id of tracking.keys()) {
         if (!settings.cameras.some((c) => c.id === id)) tracking.delete(id);
     }
     pushState();
 });
-manager.on('status', pushState);
+manager.on('status', (cameraId, status) => {
+    // A camera that just came back may have forgotten its tally state.
+    if (status.state !== 'online') tallySync.forget(cameraId);
+    else refreshAtem();
+    pushState();
+});
 video.on('status', pushState);
 video.on('frame', (cameraId, frame) => {
     // Nobody can see a minimised window; the decoder restarts on the next key frame.
@@ -144,6 +202,11 @@ ipcMain.handle('camera:test', async (_e, input, editingId) => {
 });
 
 ipcMain.handle('ui:set', (_e, patch) => store.apply(S.setUi, patch ?? {}));
+
+ipcMain.handle('atem:set', (_e, patch) => store.apply(S.setAtem, patch ?? {}));
+
+// The one write this app makes to the ATEM.
+ipcMain.handle('atem:lowerThirds', (_e, on) => atem.setKeyer(store.get().atem.lowerThirds, Boolean(on)));
 
 // --- Movement ---------------------------------------------------------------
 
@@ -271,6 +334,8 @@ app.whenReady().then(() => {
     store.load();
     manager.sync(store.get().cameras);
     syncVideo(store.get().cameras);
+    atem.configure(store.get().atem);
+    refreshAtem();
     createWindow();
 });
 
@@ -282,6 +347,7 @@ app.on('before-quit', (event) => {
     quitting = true;
     const timeout = new Promise((resolve) => setTimeout(resolve, 600));
     video.stopAll();
+    atem.dispose();
     Promise.race([manager.stopAll(), timeout])
         .then(() => Promise.race([manager.dispose(), timeout]))
         .finally(() => app.exit(0));

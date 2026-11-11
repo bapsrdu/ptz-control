@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { statusOf } from './status.js';
+import AtemSettings from './AtemSettings.jsx';
 
 const MODE_LABELS = {
     'udp-sony': 'UDP with Sony header',
@@ -10,7 +11,7 @@ const MODE_LABELS = {
 };
 
 export default function SettingsView({ state, startAdding, onBack, onError }) {
-    const { settings, statuses, profiles, video } = state;
+    const { settings, statuses, profiles, video, atem } = state;
     // null = list, 'new' = adding, otherwise the id of the camera being edited
     const [form, setForm] = useState(startAdding ? 'new' : null);
     const editing = settings.cameras.find((c) => c.id === form) ?? null;
@@ -30,7 +31,7 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                 <button type="button" onClick={onBack} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-zinc-300 hover:bg-white/10">
                     <ArrowLeft size={16} /> Back to controls
                 </button>
-                <h1 className="text-lg font-semibold">Cameras</h1>
+                <h1 className="text-lg font-semibold">Settings</h1>
             </div>
 
             {form ? (
@@ -39,6 +40,7 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                     camera={editing}
                     cameras={settings.cameras}
                     profiles={profiles}
+                    atemSummary={atem.status.state === 'connected' ? atem.summary : null}
                     onDone={() => setForm(null)}
                 />
             ) : (
@@ -64,6 +66,7 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                                         </div>
                                         <div className="mt-0.5 text-xs text-zinc-400">
                                             {profile?.label ?? camera.profile}
+                                            {camera.atemInput ? ` · ATEM input ${camera.atemInput}` : ''}
                                             {' · '}
                                             {status.state === 'online'
                                                 ? `Connected using ${MODE_LABELS[camera.mode] ?? camera.mode}`
@@ -92,6 +95,7 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                             <Plus size={16} /> Add a camera
                         </button>
                     </div>
+                    <AtemSettings atemSettings={settings.atem} atem={atem} cameras={settings.cameras} onError={onError} />
                 </>
             )}
         </div>
@@ -118,13 +122,14 @@ function IconButton({ label, danger, children, ...rest }) {
     );
 }
 
-function CameraForm({ camera, cameras, profiles, onDone }) {
+function CameraForm({ camera, cameras, profiles, atemSummary, onDone }) {
     const [fields, setFields] = useState(() => ({
         name: camera?.name ?? `Camera ${cameras.length + 1}`,
         profile: camera?.profile ?? profiles[0]?.id,
         host: camera?.host ?? '',
         port: camera ? String(camera.port) : '',
         previewUrl: camera?.previewUrl ?? '',
+        atemInput: camera?.atemInput ? String(camera.atemInput) : '',
     }));
     const [errors, setErrors] = useState({});
     const [test, setTest] = useState(null); // { running } | detect result + the host/port it was for
@@ -190,6 +195,19 @@ function CameraForm({ camera, cameras, profiles, onDone }) {
                 error={errors.previewUrl}
             >
                 <input className={input} value={fields.previewUrl} onChange={set('previewUrl')} name="previewUrl" placeholder={profile?.videoUrlTemplate?.replace('{host}', fields.host.trim() || '192.168.1.50') ?? 'rtsp://...'} spellCheck={false} />
+            </Field>
+
+            <Field label="ATEM input" hint="Which switcher input this camera's video goes into. Used to show LIVE and NEXT." error={errors.atemInput}>
+                {atemSummary ? (
+                    <select className={input} value={fields.atemInput} onChange={set('atemInput')} name="atemInput">
+                        <option value="">Not on the ATEM</option>
+                        {atemSummary.inputs.map((i) => (
+                            <option key={i.id} value={String(i.id)}>{i.id} · {i.name}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <input className={input} value={fields.atemInput} onChange={set('atemInput')} name="atemInput" placeholder="For example 3. Leave empty if none." inputMode="numeric" />
+                )}
             </Field>
 
             <div className="flex flex-col gap-2 rounded-lg bg-black/30 p-3">

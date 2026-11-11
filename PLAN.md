@@ -303,21 +303,31 @@ control once including Track Configuration, and export the log into `docs/`.
 - `sim/fake-rtsp.js` streams a test clip; `npm run sim -- --video` starts fake
   cameras with video.
 
-### Phase 4: ATEM link
+### Phase 4: ATEM link (built)
 
-- ATEM settings from feature 10. Connect and mirror the switcher's state.
-- One function, covered by tests, that takes the ATEM state and the watched
-  list and returns the set of LIVE inputs and the set of NEXT inputs. Check
-  whether `atem-connection`'s `listVisibleInputs` covers the per-M/E part
-  before writing it by hand. Badges, tally and the guard all read from this
-  one function.
-- Test cases must include: one camera on M/E 2 program, two different cameras
-  sent straight to two watched outputs, an output showing an M/E's program,
-  and a camera visible only through a key.
-- LIVE and NEXT badges, tally sync, the live-camera guard and the LOWER THIRDS
-  button. The large Live view shows the live camera, or a split when more
-  than one is live.
-- The app never changes program or preview, and never runs a transition.
+- Settings, ATEM section: address, what counts as on air (any mix of M/E
+  programs and outputs, each output shown with its ATEM name), the
+  lower-thirds key (any downstream or M/E key), and tally on/off. Each camera
+  has an ATEM input. All optional; without an ATEM the screen stays as before.
+- `src/main/atem/tally.js` works out LIVE and NEXT inputs from the ATEM state
+  and the watched list, using atem-connection's `listVisibleInputs` for keys,
+  SuperSource and nested M/Es, plus outputs that carry an M/E, clean feed or
+  SuperSource. Tested for: one camera on M/E 2 program, two cameras sent
+  straight to two watched outputs, an output showing an M/E program, a camera
+  visible only through a key, SuperSource, and mid-transition. Badges, the
+  Live view, tally and the guard all read from it.
+- LIVE and NEXT badges on tiles and shot rows. A Live view beside the selected
+  camera shows what is on air, split when two cameras are live; other live
+  sources are named.
+- Camera tally lights: red LIVE, green NEXT, off otherwise. Only changes are
+  sent, and they are re-sent when a camera reconnects. With no ATEM set up,
+  tally lights are left alone.
+- Live-camera guard: the controls of a live camera are locked until the
+  operator presses "Allow moving", and lock again when it goes off air.
+  Recalling a shot on a live camera asks first.
+- Lower thirds button in the top bar, showing the key's real state. Turning it
+  on or off is the only ATEM write.
+- `sim/fake-atem.js` stands in for the switcher in tests (`PTZ_FAKE_ATEM=1`).
 
 ### Phase 5: tracking toggle and exposure
 
@@ -378,8 +388,8 @@ guide for other temples covering fixed camera addresses and the Test button.
 ## 9. Still to confirm
 
 - Which keyer (upstream or downstream, and its number) carries the lower
-  thirds from PC02 at Raleigh.
-- Which ATEM output feeds the live stream at Raleigh, so it can be added to
-  the watched list.
+  thirds from PC02 at Raleigh. Chosen in settings; see on-site check 3.
+- Which ATEM output feeds the live stream at Raleigh, so it can be ticked in
+  the watched list. See on-site check 3.
 - Results of on-site check 1 and the HAR file.
 - Camera firmware version, shown on the web page under System, Update.

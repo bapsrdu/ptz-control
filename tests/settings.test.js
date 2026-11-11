@@ -110,3 +110,27 @@ test('store saves to disk and reloads', () => {
     assert.deepEqual(new S.SettingsStore(dir).load().cameras, []);
     assert.ok(fs.readdirSync(dir).some((f) => f.includes('broken-')));
 });
+
+test('ATEM settings: address, watched list, lower-thirds key, camera inputs', () => {
+    let s = withCameras({ name: 'Left', host: '10.0.0.1', atemInput: '3' });
+    assert.equal(s.cameras[0].atemInput, 3);
+    assert.deepEqual(s.atem, { host: '', port: 9910, watched: [], lowerThirds: null, tally: true });
+
+    s = S.setAtem(s, { host: '10.0.0.240' }).settings;
+    assert.deepEqual(s.atem.watched, [{ type: 'me', index: 0 }], 'a new ATEM watches M/E 1');
+
+    s = S.setAtem(s, {
+        watched: [{ type: 'me', index: 1 }, { type: 'aux', index: 0 }, { type: 'aux', index: 0 }, { type: 'bad', index: 2 }],
+        lowerThirds: { type: 'usk', me: 1, index: 0 },
+        tally: false,
+    }).settings;
+    assert.deepEqual(s.atem.watched, [{ type: 'me', index: 1 }, { type: 'aux', index: 0 }]);
+    assert.deepEqual(s.atem.lowerThirds, { type: 'usk', me: 1, index: 0 });
+    assert.equal(s.atem.tally, false);
+
+    assert.match(S.setAtem(s, { host: '10.0.0' }).errors.host, /IP address/);
+    assert.match(S.addCamera(s, { name: 'Right', host: '10.0.0.2', atemInput: 'x' }).errors.atemInput, /number/);
+    const cleared = S.updateCamera(s, s.cameras[0].id, { atemInput: '' }).settings;
+    assert.equal(cleared.cameras[0].atemInput, null);
+    assert.deepEqual(S.normalizeSettings({ atem: { host: 'nope nope', watched: 'x' } }).atem.watched, []);
+});

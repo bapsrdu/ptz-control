@@ -4,7 +4,7 @@ import { snapshot } from '../videoHub.js';
 
 // Saved shots: one row per camera. Click a shot to send that camera to it.
 // "+" saves where the camera is pointing now.
-export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) {
+export default function ShotsPanel({ cameras, selectedId, onlineIds, live = [], next = [], onError }) {
     const [editing, setEditing] = useState(false);
     const [adding, setAdding] = useState(null); // cameraId
     const [renaming, setRenaming] = useState(null); // presetId
@@ -37,6 +37,11 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) 
         if (out?.ok) setRenaming(null);
     }
 
+    function recall(camera, preset) {
+        if (live.includes(camera.id) && !window.confirm(`${camera.name} is live on screen.\n\nMove it to "${preset.name}" anyway? The move will be seen.`)) return;
+        act(window.ptz.recallPreset(camera.id, preset.id));
+    }
+
     function remove(camera, preset) {
         if (!window.confirm(`Delete the shot "${preset.name}" from ${camera.name}?`)) return;
         act(window.ptz.deletePreset(camera.id, preset.id));
@@ -60,8 +65,10 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) 
                 const online = onlineIds.has(camera.id);
                 return (
                     <div key={camera.id} className="flex flex-wrap items-center gap-2" data-testid="shots-row">
-                        <span className={`w-28 shrink-0 truncate rounded-lg border px-2.5 py-1.5 text-sm font-semibold ${camera.id === selectedId ? 'border-next text-white' : 'border-edge text-zinc-400'}`}>
-                            {camera.name}
+                        <span className={`flex w-28 shrink-0 flex-col rounded-lg border px-2.5 py-1 text-sm font-semibold leading-tight ${camera.id === selectedId ? 'border-accent text-white' : 'border-edge text-zinc-400'}`}>
+                            <span className="truncate">{camera.name}</span>
+                            {live.includes(camera.id) && <span className="text-[10px] font-bold tracking-wide text-live">LIVE</span>}
+                            {!live.includes(camera.id) && next.includes(camera.id) && <span className="text-[10px] font-bold tracking-wide text-next">NEXT</span>}
                         </span>
                         {camera.presets.map((preset) => (
                             renaming === preset.id ? (
@@ -81,7 +88,7 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) 
                                     key={preset.id}
                                     type="button"
                                     disabled={!online || busy}
-                                    onClick={() => act(window.ptz.recallPreset(camera.id, preset.id))}
+                                    onClick={() => recall(camera, preset)}
                                     className={`${chip} flex items-center gap-2 bg-zinc-200 text-zinc-900 hover:bg-white disabled:opacity-40 ${preset.thumb ? 'py-1 pl-1' : ''}`}
                                 >
                                     {preset.thumb && (

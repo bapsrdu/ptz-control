@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { VideoOff } from 'lucide-react';
 import { attach } from '../videoHub.js';
 
@@ -6,10 +6,16 @@ import { attach } from '../videoHub.js';
 // The camera can still be moved without video.
 export default function VideoView({ cameraId, status, large = false }) {
     const canvas = useRef(null);
+    const [hasPicture, setHasPicture] = useState(false);
 
-    useEffect(() => attach(cameraId, canvas.current), [cameraId]);
+    useEffect(() => {
+        setHasPicture(false);
+        return attach(cameraId, canvas.current, () => setHasPicture(true));
+    }, [cameraId]);
 
-    const playing = status?.state === 'playing';
+    // "Playing" from the camera, and a picture actually drawn here.
+    const playing = status?.state === 'playing' && hasPicture;
+    const starting = !status || status.state === 'connecting' || (status.state === 'playing' && !hasPicture);
     return (
         <div className="absolute inset-0 bg-black">
             <canvas ref={canvas} data-testid="video-canvas" className={`h-full w-full object-contain ${playing ? '' : 'invisible'}`} />
@@ -18,10 +24,10 @@ export default function VideoView({ cameraId, status, large = false }) {
                     <VideoOff size={large ? 32 : 20} className="text-white/25" />
                     {large ? (
                         <span className="max-w-md text-sm text-zinc-400">
-                            {status?.state === 'connecting' || !status ? 'Starting video...' : status.message || 'No video'}
+                            {starting ? 'Starting video...' : status.message || 'No video'}
                         </span>
                     ) : (
-                        <span className="text-[11px] text-zinc-500">{status?.state === 'connecting' || !status ? 'Starting video' : 'No video'}</span>
+                        <span className="text-[11px] text-zinc-500">{starting ? 'Starting video' : 'No video'}</span>
                     )}
                 </div>
             )}

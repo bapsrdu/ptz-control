@@ -23,10 +23,18 @@ export const PRESET_NAME_MAX = 30;
 export const SHOT_PRESET_FIRST = 1;
 export const SHOT_PRESET_LAST = 254;
 
+export const ATEM_PORT = 9910;
+
+export function defaultAtem() {
+    // host '' means no ATEM: the app is a plain camera controller.
+    return { host: '', port: ATEM_PORT, watched: [], lowerThirds: null, tally: true };
+}
+
 export function defaultSettings() {
     return {
         version: SETTINGS_VERSION,
         cameras: [],
+        atem: defaultAtem(),
         ui: { speed: SPEED_DEFAULT, selectedCameraId: null },
     };
 }
@@ -86,10 +94,17 @@ export function validateCameraInput(input = {}, { cameras = [], editingId = null
         if (!ok) errors.previewUrl = 'The video address must start with rtsp://, for example rtsp://192.168.1.50:554/live/av1.';
     }
 
+    // Which ATEM input the camera's video goes into. Empty means none.
+    const inputText = String(input.atemInput ?? '').trim();
+    const atemInput = inputText === '' ? null : Number(inputText);
+    if (atemInput !== null && (!Number.isInteger(atemInput) || atemInput < 1 || atemInput > 999)) {
+        errors.atemInput = 'The ATEM input must be a number, for example 3.';
+    }
+
     return {
         ok: Object.keys(errors).length === 0,
         errors,
-        value: { name, host, port, profile: profileId, mode, previewUrl },
+        value: { name, host, port, profile: profileId, mode, previewUrl, atemInput },
     };
 }
 
@@ -132,6 +147,8 @@ export function normalizeSettings(raw) {
             if (camera) out.cameras.push(camera);
         }
     }
+    const atem = validateAtem(raw.atem ?? {});
+    out.atem = atem.errors.host ? { ...atem.value, host: '' } : atem.value;
     const ui = raw.ui && typeof raw.ui === 'object' ? raw.ui : {};
     out.ui.speed = clampSpeed(ui.speed ?? SPEED_DEFAULT);
     out.ui.selectedCameraId = out.cameras.some((c) => c.id === ui.selectedCameraId)
@@ -262,6 +279,64 @@ export function removePreset(settings, cameraId, presetId) {
         if (!camera.presets.some((p) => p.id === presetId)) return failure({ form: 'This shot no longer exists.' });
         return { ok: true, camera: { ...camera, presets: camera.presets.filter((p) => p.id !== presetId) } };
     });
+}
+
+// --- ATEM ---------------------------------------------------------------------
+
+function cleanWatched(list) {
+    const out = [];
+    const seen = new Set();
+    for (const w of Array.isArray(list) ? list : []) {
+        const type = w?.type === 'me' || w?.type === 'aux' ? w.type : null;
+        const index = Number(w?.index);
+        if (!type || !Number.isInteger(index) || index < 0 || index > 31) continue;
+        const key = `${type}:${index}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ type, index });
+    }
+    return out;
+}
+
+function cleanKeyer(k) {
+    const index = Number(k?.index);
+    if (!Number.isInteger(index) || index < 0 || index > 7) return null;
+    if (k?.type === 'dsk') return { type: 'dsk', index };
+    const me = Number(k?.me);
+    if (k?.type === 'usk' && Number.isInteger(me) && me >= 0 && me <= 7) return { type: 'usk', me, index };
+    return null;
+}
+
+export function validateAtem(input = {}) {
+    const errors = {};
+    const host = cleanText(input.host, 253);
+    if (host && !isValidHost(host)) errors.host = 'This does not look like an IP address.';
+    const portText = String(input.port ?? '').trim();
+    const port = portText === '' ? ATEM_PORT : Number(portText);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) errors.port = 'The port must be a whole number from 1 to 65535.';
+    return {
+        ok: Object.keys(errors).length === 0,
+        errors,
+        value: {
+            host,
+            port: errors.port ? ATEM_PORT : port,
+            watched: cleanWatched(input.watched),
+            lowerThirds: cleanKeyer(input.lowerThirds),
+            tally: input.tally !== false,
+        },
+    };
+}
+
+export function setAtem(settings, patch = {}) {
+    const merged = { ...settings.atem, ...patch };
+    const check = validateAtem(merged);
+    if (!check.ok) return failure(check.errors);
+    const atem = check.value;
+    // A newly added ATEM starts by watching M/E 1, the usual main output.
+    if (atem.host && !settings.atem.host && !('watched' in patch) && atem.watched.length === 0) {
+        atem.watched = [{ type: 'me', index: 0 }];
+    }
+    return result({ ...settings, atem });
 }
 
 export function setUi(settings, patch = {}) {

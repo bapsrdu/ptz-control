@@ -6,6 +6,8 @@ import ShotsPanel from './components/ShotsPanel.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { statusOf } from './components/status.js';
 import VideoView from './components/VideoView.jsx';
+import LiveView from './components/LiveView.jsx';
+import LowerThirdsButton from './components/LowerThirdsButton.jsx';
 
 export default function App() {
     const [state, setState] = useState(null);
@@ -38,14 +40,20 @@ export default function App() {
                 <Video size={20} className="text-accent" />
                 <span className="font-semibold">PTZ Control</span>
                 <span className="text-sm text-zinc-500">{summary(state)}</span>
+                <AtemBadge atem={state.atem} configured={Boolean(state.settings.atem.host)} />
                 {view.name === 'control' && (
-                    <button
-                        type="button"
-                        onClick={() => setView({ name: 'settings' })}
-                        className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/10"
-                    >
-                        <Settings size={16} /> Cameras
-                    </button>
+                    <div className="ml-auto flex items-center gap-2">
+                        {state.atem.status.state === 'connected' && state.settings.atem.lowerThirds && (
+                            <LowerThirdsButton state={state.atem.lowerThirds} onError={showError} />
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setView({ name: 'settings' })}
+                            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/10"
+                        >
+                            <Settings size={16} /> Settings
+                        </button>
+                    </div>
                 )}
             </header>
 
@@ -82,6 +90,17 @@ function summary({ settings, statuses }) {
     return `${online} of ${total} camera${total === 1 ? '' : 's'} connected`;
 }
 
+function AtemBadge({ atem, configured }) {
+    if (!configured) return null;
+    const ok = atem.status.state === 'connected';
+    return (
+        <span title={atem.status.message} className="flex items-center gap-1.5 rounded-full border border-edge px-2.5 py-0.5 text-xs text-zinc-400">
+            <span className={`h-2 w-2 rounded-full ${ok ? 'bg-green-400' : 'bg-amber-400'}`} />
+            {ok ? atem.status.model || 'ATEM' : 'ATEM not connected'}
+        </span>
+    );
+}
+
 function Welcome({ onAdd }) {
     return (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
@@ -114,7 +133,8 @@ function Step({ number, title, children }) {
 }
 
 function ControlView({ state, onError }) {
-    const { settings, statuses, tracking, profiles, video } = state;
+    const { settings, statuses, tracking, profiles, video, atem } = state;
+    const withAtem = Boolean(settings.atem.host);
     const cameras = settings.cameras;
     const selected = cameras.find((c) => c.id === settings.ui.selectedCameraId) ?? cameras[0];
     const status = statusOf(statuses, selected.id);
@@ -124,29 +144,48 @@ function ControlView({ state, onError }) {
         [cameras, statuses],
     );
 
-    return (
-        <div className="flex flex-col gap-6 p-5">
-            <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
-                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-next" data-testid="selected-view">
-                    <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
-                    <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm">
-                        <span className={`h-2 w-2 rounded-full ${status.dot}`} />
-                        <span className="font-semibold">{selected.name}</span>
-                        {status.state !== 'online' && <span className="text-zinc-400">{status.message || status.label}</span>}
-                    </div>
-                </div>
-
-                <Step number={1} title="Pick a camera">
-                    <CameraTiles
-                        cameras={cameras}
-                        statuses={statuses}
-                        video={video}
-                        tracking={tracking}
-                        selectedId={selected.id}
-                        onSelect={(id) => window.ptz.setUi({ selectedCameraId: id })}
-                    />
-                </Step>
+    const selectedView = (
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-accent" data-testid="selected-view">
+            <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
+            <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm">
+                <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+                <span className="font-semibold">{selected.name}</span>
+                {status.state !== 'online' && <span className="text-zinc-400">{status.message || status.label}</span>}
             </div>
+        </div>
+    );
+    const tiles = (
+        <Step number={1} title="Pick a camera">
+            <CameraTiles
+                cameras={cameras}
+                statuses={statuses}
+                video={video}
+                tracking={tracking}
+                selectedId={selected.id}
+                live={atem.live}
+                next={atem.next}
+                onSelect={(id) => window.ptz.setUi({ selectedCameraId: id })}
+            />
+        </Step>
+    );
+
+    return (
+        <div className="flex flex-col gap-4 p-5">
+            {withAtem ? (
+                <>
+                    {/* With an ATEM: the selected camera beside what is on air. */}
+                    <div className="grid grid-cols-2 gap-5 self-start" style={{ width: 'min(100%, calc(27vh * 32 / 9 + 1.25rem))' }}>
+                        {selectedView}
+                        <LiveView atem={atem} cameras={cameras} video={video} />
+                    </div>
+                    {tiles}
+                </>
+            ) : (
+                <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
+                    {selectedView}
+                    {tiles}
+                </div>
+            )}
 
             <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-6">
                 <Step number={2} title={`Frame ${selected.name}`}>
@@ -155,6 +194,7 @@ function ControlView({ state, onError }) {
                             camera={selected}
                             profile={profile}
                             online={status.state === 'online'}
+                            live={atem.live.includes(selected.id)}
                             trackingOn={Boolean(tracking[selected.id])}
                             speed={settings.ui.speed}
                             onError={onError}
@@ -163,7 +203,7 @@ function ControlView({ state, onError }) {
                 </Step>
 
                 <div className="mt-8 rounded-2xl border border-edge bg-panel p-5">
-                    <ShotsPanel cameras={cameras} selectedId={selected.id} onlineIds={onlineIds} onError={onError} />
+                    <ShotsPanel cameras={cameras} selectedId={selected.id} onlineIds={onlineIds} live={atem.live} next={atem.next} onError={onError} />
                 </div>
             </div>
         </div>

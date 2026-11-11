@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Home, PersonStanding, Rabbit, Turtle } from 'lucide-react';
+import { Home, PersonStanding, Rabbit, Radio, Turtle } from 'lucide-react';
 import Joystick from './Joystick.jsx';
 import ZoomSlider from './ZoomSlider.jsx';
 import HoldButton from './HoldButton.jsx';
@@ -8,9 +8,17 @@ import { useDrive } from '../useDrive.js';
 const SPEED_DEFAULT = 0.5;
 
 // Step 2: everything for framing the selected camera.
-export default function FramePanel({ camera, profile, online, trackingOn, speed, onError }) {
+export default function FramePanel({ camera, profile, online, live = false, trackingOn, speed, onError }) {
     const [focusMode, setFocusMode] = useState({}); // cameraId -> 'auto' | 'manual'
     const [localSpeed, setLocalSpeed] = useState(speed);
+    // Moving a camera that is on air needs a deliberate "allow" first. It
+    // locks again when the camera goes off air or another camera is picked.
+    const [allowedLive, setAllowedLive] = useState(null);
+    const locked = live && allowedLive !== camera.id;
+
+    useEffect(() => {
+        if (!live) setAllowedLive(null);
+    }, [live]);
     const mode = focusMode[camera.id] ?? 'auto';
     const focus = useDrive({
         send: (id, dir) => window.ptz.focus(id, dir),
@@ -37,65 +45,82 @@ export default function FramePanel({ camera, profile, online, trackingOn, speed,
         if (out?.ok) setFocusMode((m) => ({ ...m, [camera.id]: next }));
     }
 
-    const disabled = !online;
+    const disabled = !online || locked;
     const pill = (active) => `rounded-lg px-3 py-1.5 text-sm font-medium transition ${active ? 'bg-accent text-zinc-900' : 'bg-panel-2 text-zinc-300 hover:bg-white/10'}`;
 
     return (
-        <div className="flex items-center gap-6">
-            <Joystick cameraId={camera.id} disabled={disabled} />
-            <ZoomSlider cameraId={camera.id} disabled={disabled} />
-
-            <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                    <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Focus</span>
-                    <button type="button" disabled={disabled} className={pill(mode === 'auto')} onClick={() => chooseFocus('auto')}>Auto</button>
-                    <button type="button" disabled={disabled} className={pill(mode === 'manual')} onClick={() => chooseFocus('manual')}>Manual</button>
+        <div className="flex flex-col gap-4">
+            {live && (
+                <div data-testid="live-guard" className={`flex items-center gap-3 rounded-xl border px-4 py-2 text-sm ${locked ? 'border-live/60 bg-live/15 text-red-100' : 'border-live/40 text-red-200'}`}>
+                    <Radio size={18} className="shrink-0 text-live" />
+                    {locked ? (
+                        <>
+                            <span><b>{camera.name} is live.</b> Any movement will be seen on screen.</span>
+                            <button type="button" onClick={() => setAllowedLive(camera.id)} className="ml-auto shrink-0 rounded-lg bg-live px-3 py-1 font-semibold text-white hover:bg-red-400">
+                                Allow moving
+                            </button>
+                        </>
+                    ) : (
+                        <span>Moving {camera.name} while it is live.</span>
+                    )}
                 </div>
-                {mode === 'manual' && (
-                    <div className="flex items-center gap-2 pl-[4.5rem]">
-                        <HoldButton disabled={disabled} className={pill(false)} onHold={() => focus.set(camera.id, 'near')} onRelease={focus.release}>Near</HoldButton>
-                        <HoldButton disabled={disabled} className={pill(false)} onHold={() => focus.set(camera.id, 'far')} onRelease={focus.release}>Far</HoldButton>
-                    </div>
-                )}
+            )}
+            <div className="flex items-center gap-6">
+                <Joystick cameraId={camera.id} disabled={disabled} />
+                <ZoomSlider cameraId={camera.id} disabled={disabled} />
 
-                {profile?.features.tracking && (
+                <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
-                        <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Tracking</span>
-                        <button
-                            type="button"
-                            disabled={disabled}
-                            aria-pressed={trackingOn}
-                            className={`${pill(trackingOn)} flex items-center gap-1.5`}
-                            onClick={() => run(window.ptz.tracking(camera.id, !trackingOn))}
-                        >
-                            <PersonStanding size={16} /> {trackingOn ? 'On' : 'Off'}
+                        <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Focus</span>
+                        <button type="button" disabled={disabled} className={pill(mode === 'auto')} onClick={() => chooseFocus('auto')}>Auto</button>
+                        <button type="button" disabled={disabled} className={pill(mode === 'manual')} onClick={() => chooseFocus('manual')}>Manual</button>
+                    </div>
+                    {mode === 'manual' && (
+                        <div className="flex items-center gap-2 pl-[4.5rem]">
+                            <HoldButton disabled={disabled} className={pill(false)} onHold={() => focus.set(camera.id, 'near')} onRelease={focus.release}>Near</HoldButton>
+                            <HoldButton disabled={disabled} className={pill(false)} onHold={() => focus.set(camera.id, 'far')} onRelease={focus.release}>Far</HoldButton>
+                        </div>
+                    )}
+
+                    {profile?.features.tracking && (
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Tracking</span>
+                            <button
+                                type="button"
+                                disabled={disabled}
+                                aria-pressed={trackingOn}
+                                className={`${pill(trackingOn)} flex items-center gap-1.5`}
+                                onClick={() => run(window.ptz.tracking(camera.id, !trackingOn))}
+                            >
+                                <PersonStanding size={16} /> {trackingOn ? 'On' : 'Off'}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Position</span>
+                        <button type="button" disabled={disabled} className={`${pill(false)} flex items-center gap-1.5`} onClick={() => run(window.ptz.home(camera.id))}>
+                            <Home size={16} /> Home
                         </button>
                     </div>
-                )}
 
-                <div className="flex items-center gap-2">
-                    <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Position</span>
-                    <button type="button" disabled={disabled} className={`${pill(false)} flex items-center gap-1.5`} onClick={() => run(window.ptz.home(camera.id))}>
-                        <Home size={16} /> Home
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Speed</span>
-                    <Turtle size={18} className="text-zinc-400" />
-                    <input
-                        type="range"
-                        aria-label="Movement speed"
-                        min={0.1}
-                        max={1}
-                        step={0.05}
-                        value={localSpeed}
-                        onChange={(e) => setLocalSpeed(Number(e.target.value))}
-                        className="w-32 accent-sky-300"
-                    />
-                    <Rabbit size={18} className="text-zinc-400" />
-                    <span className="w-10 text-right text-sm tabular-nums text-zinc-300">{Math.round(localSpeed * 100)}%</span>
-                    <button type="button" className="text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setLocalSpeed(SPEED_DEFAULT)}>Reset</button>
+                    <div className="flex items-center gap-2">
+                        <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Speed</span>
+                        <Turtle size={18} className="text-zinc-400" />
+                        <input
+                            type="range"
+                            aria-label="Movement speed"
+                            min={0.1}
+                            max={1}
+                            step={0.05}
+                            value={localSpeed}
+                            onChange={(e) => setLocalSpeed(Number(e.target.value))}
+                            className="w-32 accent-sky-300"
+                        />
+                        <Rabbit size={18} className="text-zinc-400" />
+                        <span className="w-10 text-right text-sm tabular-nums text-zinc-300">{Math.round(localSpeed * 100)}%</span>
+                        <button type="button" className="text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setLocalSpeed(SPEED_DEFAULT)}>Reset</button>
+                    </div>
                 </div>
             </div>
         </div>

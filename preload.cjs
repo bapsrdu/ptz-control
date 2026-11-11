@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('ptz', {
     moveCamera: invoke('camera:move'),
     testCamera: invoke('camera:test'),
 
+    // ATEM: setAtem({ host, port, watched, lowerThirds, tally })
+    setAtem: invoke('atem:set'),
+    lowerThirds: invoke('atem:lowerThirds'),
+
     // Screen preferences: { speed, selectedCameraId }
     setUi: invoke('ui:set'),
 

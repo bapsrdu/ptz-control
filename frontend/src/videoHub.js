@@ -9,7 +9,7 @@ let listening = false;
 function entry(id) {
     let cam = cameras.get(id);
     if (!cam) {
-        cam = { decoder: null, codec: null, canvases: new Set(), waitingForKey: true, ts: 0, hasPicture: false };
+        cam = { decoder: null, codec: null, canvases: new Set(), waitingForKey: true, ts: 0, hasPicture: false, onPicture: new Map() };
         cameras.set(id, cam);
     }
     return cam;
@@ -31,6 +31,12 @@ function draw(cam, frame) {
                 canvas.height = frame.displayHeight;
             }
             canvas.getContext('2d').drawImage(frame, 0, 0);
+            // Tell a newly attached view once that it has a picture.
+            const notify = cam.onPicture.get(canvas);
+            if (notify) {
+                cam.onPicture.delete(canvas);
+                notify();
+            }
         }
         cam.hasPicture = true;
     } finally {
@@ -76,16 +82,19 @@ function onFrame(id, { codec, key, data }) {
     }
 }
 
-// Shows a camera's video on a canvas. Returns a function that stops it.
-export function attach(cameraId, canvas) {
+// Shows a camera's video on a canvas. onPicture() is called once, when the
+// first picture is drawn on it. Returns a function that stops it.
+export function attach(cameraId, canvas, onPicture) {
     if (!listening) {
         listening = true;
         window.ptz.onVideoFrame(onFrame);
     }
     const cam = entry(cameraId);
     cam.canvases.add(canvas);
+    if (onPicture) cam.onPicture.set(canvas, onPicture);
     return () => {
         cam.canvases.delete(canvas);
+        cam.onPicture.delete(canvas);
         if (!cam.canvases.size) {
             reset(cam);
             cam.hasPicture = false;

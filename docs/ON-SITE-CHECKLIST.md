@@ -68,6 +68,36 @@ Firmware version is on the camera web page under System, Update.
       the computer does not get hot or slow. Note the app's memory and CPU in
       Task Manager: ____ MB, ____ %.
 
+## Check 3: after phase 4 (ATEM)
+
+Setup, in Settings:
+
+- [ ] Enter the ATEM's IP address and press Connect. It says "Connected to"
+      and the model. ATEM IP: ____________
+- [ ] Edit each camera and choose its ATEM input (Left 3, Centre 4, Right 5 on
+      the routing diagram).
+- [ ] Under "What counts as on air", tick M/E 2 program, Output 1 (Left
+      Screen), Output 2 (Right Screen), and whichever output feeds the live
+      stream. Output feeding the stream: ____
+- [ ] Choose the lower-thirds key: the key that carries PC02 (input 15).
+      Key used: ____
+
+On the controls:
+
+- [ ] Cut a camera to M/E 2 program on the ATEM panel. Its tile says LIVE, its
+      tally light turns red, and it shows in the Live view.
+- [ ] Put a camera on M/E 2 preview. Its tile says NEXT and its tally turns
+      green.
+- [ ] Send different cameras to the left and right screens. Both show LIVE
+      and the Live view splits.
+- [ ] Pick a live camera. The controls are locked with "Allow moving". After
+      pressing it, the joystick works.
+- [ ] Click a shot on a live camera. It asks before moving.
+- [ ] Lower thirds button turns the lower third on and off, and follows the
+      ATEM panel if someone presses the key there.
+- [ ] Check with the director: the app never changed what was on air.
+- [ ] Untick "tally lights follow the ATEM". The tally lights go off.
+
 ### For phase 6
 
 - [ ] Open one camera's web page in Chrome. Open DevTools (F12) on the Network
