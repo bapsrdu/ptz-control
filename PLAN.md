@@ -95,7 +95,7 @@ clearly in the manual and must be confirmed on a real camera.
 |---|---|
 | Default address | 192.168.5.163, login admin / admin |
 | Web page | port 80 (HTTPS 443) |
-| VISCA over IP | port 1259. UDP or TCP, and raw VISCA or Sony 8-byte header: verify |
+| VISCA over IP | port 1259, UDP, plain VISCA (no Sony header). Confirmed by the Test button on a Raleigh camera |
 | Web page live channel | WebSocket, port 8088 |
 | ONVIF | port 2000 |
 | Preview video | `rtsp://IP:554/live/av1` (sub stream, up to 720x480). Main stream is `live/av0` |

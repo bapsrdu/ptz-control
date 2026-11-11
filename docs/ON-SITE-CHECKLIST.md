@@ -60,5 +60,8 @@ Firmware version is on the camera web page under System, Update.
 
 ### Results
 
+- Raleigh: the Test button found a BG-ADAMO-4KND25X on port 1259 using UDP,
+  plain VISCA (no Sony header).
+
 Write anything surprising here: commands the camera refused, movements in the
 wrong direction, speeds that feel wrong.
