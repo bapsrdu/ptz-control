@@ -28,7 +28,7 @@ numbered steps.
 | Area | What it shows | In our app |
 |---|---|---|
 | Top left, green border | Large preview of the "next" camera | Large view of the selected camera |
-| Top right, red border | Large view of what is live | Large view of the live camera, when an ATEM is connected |
+| Top right, red border | Large view of what is live | Large view of the live camera or cameras, when an ATEM is connected |
 | Step 1 "Pick what's next" | Row of live thumbnails with LIVE and NEXT badges and a tracking icon | Same row, one tile per camera the user has added. Clicking a tile selects that camera for control. It does not change the ATEM |
 | Step 2 "Frame Cam N" | Joystick, zoom slider, speed slider with Reset, Focus, Tracking toggle with Close / Waist / Full, Exposure | Same, except Close / Waist / Full only exists with app-side tracking (phase 7) |
 | Step 3 "Take it live" | FADE, CUT, BLACK, LOWER THIRDS | Only the LOWER THIRDS on/off button |
@@ -58,19 +58,33 @@ site and the test case. None of it is written into the code.
 | 9 | Resolume Confidence |
 | 10 to 13 | Patch Panel 1 to 4 |
 | 14 | Stage Input (HDMI) |
-| 15 | PC02 |
+| 15 | PC02, the VFX computer running Broadcast Controller (lower thirds) |
 | 16 | Apple TV |
 | 17 | PTZ Mandir |
 | 18 | LED Novastar multiview |
 | 19 | HyperDeck |
 | 20 | Axis Center |
 
-Inputs 17 and 20 are further cameras. If they accept VISCA they can be added in
-the app like any other. If not, they simply do not appear.
+Inputs 17 and 20 are other cameras. They are out of scope and are not added.
+
+| ATEM output | Destination |
+|---|---|
+| 1 | Left LED screen |
+| 2 | Right LED screen |
+| 3 | Stage confidence monitor |
+| 4 | Backstage TV |
+| 5 | Rack distributor |
+| 6 | Hallway TVs |
+| 9 | HyperDeck |
 
 Lower thirds come from Broadcast Controller
-(`amlakhani/Broadcast-Controller-Public`) on the VFX computer, which reaches
-the ATEM by SDI. Which input and which keyer carry it is chosen in settings.
+(`amlakhani/Broadcast-Controller-Public`) on PC02, input 15. Which keyer
+carries it is chosen in settings.
+
+Raleigh usually runs the show on M/E 2. Sometimes the left and right LED
+screens are given different sources, so two cameras can be on screen at once
+and neither M/E alone says what is live. This is why "live" is worked out from
+outputs, as described in feature 10.
 
 ## 4. Facts about the BZB camera
 
@@ -144,9 +158,16 @@ camera's tracker or the app's tracker, never both.
 
 **Should have, needs the ATEM link**
 
-10. ATEM settings: address, which M/E row to watch, which ATEM input each
-    camera is on, and which keyer carries the lower thirds.
-11. LIVE and NEXT badges on the thumbnails, mirrored from the ATEM.
+10. ATEM settings: address, which ATEM input each camera is on, which keyer
+    carries the lower thirds, and a "watched" list. The watched list is any
+    mix of M/E rows and ATEM outputs that count as on air, for example M/E 2
+    plus the left and right screen outputs.
+11. LIVE and NEXT badges on the thumbnails. A camera is LIVE when it is visible
+    on any watched M/E program or watched output. When an output is showing an
+    M/E's program, follow it through to the cameras on that M/E, including
+    ones visible through a key or SuperSource. More than one camera can be
+    LIVE at the same time. A camera is NEXT when it is on the preview of a
+    watched M/E and is not LIVE.
 12. Camera tally lights follow the ATEM: red when live, green when next. Can be
     switched off in settings.
 13. LOWER THIRDS on/off button for the chosen keyer, showing its real state.
@@ -258,10 +279,18 @@ control once including Track Configuration, and export the log into `docs/`.
 
 ### Phase 4: ATEM link
 
-- ATEM settings from feature 10. Connect, mirror program and preview on the
-  chosen M/E.
-- LIVE and NEXT badges, the large Live view, tally sync, the live-camera
-  guard and the LOWER THIRDS button.
+- ATEM settings from feature 10. Connect and mirror the switcher's state.
+- One function, covered by tests, that takes the ATEM state and the watched
+  list and returns the set of LIVE inputs and the set of NEXT inputs. Check
+  whether `atem-connection`'s `listVisibleInputs` covers the per-M/E part
+  before writing it by hand. Badges, tally and the guard all read from this
+  one function.
+- Test cases must include: one camera on M/E 2 program, two different cameras
+  sent straight to two watched outputs, an output showing an M/E's program,
+  and a camera visible only through a key.
+- LIVE and NEXT badges, tally sync, the live-camera guard and the LOWER THIRDS
+  button. The large Live view shows the live camera, or a split when more
+  than one is live.
 - The app never changes program or preview, and never runs a transition.
 
 ### Phase 5: tracking toggle and exposure
@@ -322,10 +351,9 @@ guide for other temples covering fixed camera addresses and the Test button.
 
 ## 9. Still to confirm
 
-- Which ATEM input and which keyer (upstream or downstream, and its number)
-  carry Broadcast Controller's lower thirds at Raleigh.
-- Which M/E row feeds the live stream at Raleigh.
+- Which keyer (upstream or downstream, and its number) carries the lower
+  thirds from PC02 at Raleigh.
+- Which ATEM output feeds the live stream at Raleigh, so it can be added to
+  the watched list.
 - Results of on-site check 1 and the HAR file.
 - Camera firmware version, shown on the web page under System, Update.
-- Whether "PTZ Mandir" (input 17) and "Axis Center" (input 20) should be
-  controlled too, and what models they are.
