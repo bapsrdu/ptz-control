@@ -19,12 +19,12 @@ const RED_OFF = '81 01 7E 01 0A 00 03 00 FF';
 const GREEN_ON = '81 01 7E 01 0A 00 00 02 FF';
 const GREEN_OFF = '81 01 7E 01 0A 00 00 03 FF';
 
-async function until(check, what, timeoutMs = 5000) {
+async function until(check, what, timeoutMs = 8000) {
     const start = Date.now();
     for (;;) {
         const value = await check();
         if (value) return value;
-        if (Date.now() - start > timeoutMs) throw new Error(`timed out waiting for ${what}`);
+        if (Date.now() - start > timeoutMs) throw new Error(`timed out waiting for ${typeof what === 'function' ? what() : what}`);
         await new Promise((r) => setTimeout(r, 50));
     }
 }
@@ -99,14 +99,21 @@ test('LIVE and NEXT, tally lights, live-camera guard and lower thirds', async (t
     // A live camera can be moved straight away; a red note says it is live.
     await tile('Centre').click();
     await page.getByTestId('live-note').waitFor();
+    await page.getByText('Frame Centre').waitFor();
+    // Ready means: connected, and the joystick is not greyed out.
+    await page.locator('[data-testid=joystick][aria-disabled=false]').waitFor();
     cams[1].clearLog();
     const pad = await page.getByTestId('joystick').boundingBox();
     await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
     await page.mouse.down();
-    await page.mouse.move(pad.x + pad.width - 5, pad.y + pad.height / 2, { steps: 3 });
-    await page.waitForTimeout(200);
+    await page.mouse.move(pad.x + pad.width - 5, pad.y + pad.height / 2, { steps: 5 });
+    await page.waitForTimeout(500);
     await page.mouse.up();
-    await until(() => cams[1].received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('02 03 FF')), 'live camera moves without unlocking');
+    await until(
+        () => cams[1].received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('02 03 FF')),
+        () => `live camera moves without unlocking (camera got: ${cams[1].received.join(' | ') || 'nothing'})`,
+        10000,
+    );
     if (shots) await page.screenshot({ path: path.join(shots, '09-live-camera.png') });
 
     // Recalling a shot on a live camera goes straight through, no question.

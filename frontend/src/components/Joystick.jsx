@@ -50,6 +50,7 @@ export default function Joystick({ cameraId, disabled }) {
             ref={pad}
             data-testid="joystick"
             aria-label="Pan and tilt"
+            aria-disabled={Boolean(disabled)}
             className={`relative shrink-0 touch-none rounded-full border border-edge bg-panel-2 ${disabled ? 'opacity-40' : 'cursor-grab active:cursor-grabbing'}`}
             style={{ width: SIZE, height: SIZE }}
             onPointerDown={(e) => {
