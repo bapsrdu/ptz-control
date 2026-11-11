@@ -90,9 +90,8 @@ On the controls:
       green.
 - [ ] Send different cameras to the left and right screens. Both show LIVE
       and the Live view splits.
-- [ ] Pick a live camera. The controls are locked with "Allow moving". After
-      pressing it, the joystick works.
-- [ ] Click a shot on a live camera. It asks before moving.
+- [ ] Pick a live camera. A red "LIVE · moves will be seen" note shows, and
+      the joystick and shots work straight away.
 - [ ] Lower thirds button turns the lower third on and off, and follows the
       ATEM panel if someone presses the key there.
 - [ ] Check with the director: the app never changed what was on air.

@@ -96,7 +96,7 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     await page.getByRole('button', { name: 'Back to controls' }).click();
 
     assert.equal(await page.getByTestId('camera-tile').count(), 1);
-    await page.getByTestId('camera-tile').filter({ hasText: 'Connected' }).waitFor();
+    await page.locator('[data-testid=camera-tile][data-state=online]').waitFor();
     await waitForPicture(page, page.getByTestId('selected-view').getByTestId('video-canvas'));
     await waitForPicture(page, page.getByTestId('camera-tile').getByTestId('video-canvas'));
 
@@ -156,7 +156,7 @@ test('blur stops a camera that is being moved', async (t) => {
     }));
     const { app, page } = await launch(dir);
     t.after(async () => { await app.close(); await fake.stop(); });
-    await page.getByTestId('camera-tile').filter({ hasText: 'Connected' }).waitFor();
+    await page.locator('[data-testid=camera-tile][data-state=online]').waitFor();
 
     // No video server for this camera: the reason is shown, and the camera
     // can still be moved.
@@ -200,7 +200,7 @@ for (const count of [1, 3, 6]) {
         assert.equal(await page.getByTestId('camera-tile').count(), count);
         assert.equal(await page.getByTestId('shots-row').count(), count);
         await page.waitForFunction((n) => document.querySelectorAll('[data-testid=camera-tile]').length === n
-            && [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.textContent.includes('Connected')), count);
+            && [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.dataset.state === 'online'), count);
 
         // Every tile shows its camera's video.
         const canvases = page.getByTestId('camera-tiles').getByTestId('video-canvas');

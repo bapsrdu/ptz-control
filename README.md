@@ -47,8 +47,8 @@ video address in the camera's settings, for example
 
 With an ATEM switcher (optional, set up under **Settings**): tiles show which
 camera is LIVE and which is NEXT, a Live view shows what is on air, the
-cameras' tally lights follow the switcher, a live camera's controls stay
-locked until you press **Allow moving**, and a **Lower thirds** button turns
+cameras' tally lights follow the switcher, a red note warns when the camera
+you are moving is live, and a **Lower thirds** button turns
 the lower-thirds key on and off. The app never switches cameras; that stays on
 the ATEM.
 

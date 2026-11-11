@@ -38,7 +38,6 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, live = [], 
     }
 
     function recall(camera, preset) {
-        if (live.includes(camera.id) && !window.confirm(`${camera.name} is live on screen.\n\nMove it to "${preset.name}" anyway? The move will be seen.`)) return;
         act(window.ptz.recallPreset(camera.id, preset.id));
     }
 

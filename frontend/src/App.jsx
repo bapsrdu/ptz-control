@@ -122,15 +122,21 @@ function Welcome({ onAdd }) {
     );
 }
 
-function Step({ number, title, children }) {
+function StepLabel({ number, title }) {
     return (
-        <section className="flex flex-col gap-3">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-200 text-[11px] text-zinc-900">{number}</span>
-                {title}
-            </h2>
-            {children}
-        </section>
+        <h2 className="flex shrink-0 items-center gap-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-200 text-[11px] text-zinc-900">{number}</span>
+            {title}
+        </h2>
+    );
+}
+
+// Fits a 16:9 box as large as possible inside the space it is given.
+function Fit({ children }) {
+    return (
+        <div className="flex min-h-0 min-w-0 items-center justify-center" style={{ containerType: 'size' }}>
+            <div style={{ width: 'min(100cqw, calc(100cqh * 16 / 9))', aspectRatio: '16 / 9' }}>{children}</div>
+        </div>
     );
 }
 
@@ -147,9 +153,11 @@ function ControlView({ state, onError }) {
         [cameras, statuses],
     );
 
+    const live = atem.live.includes(selected.id);
     const selectedView = (
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-accent" data-testid="selected-view">
+        <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-accent" data-testid="selected-view">
             <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
+            <span className="absolute left-3 top-3 rounded bg-accent px-2 py-0.5 text-xs font-bold tracking-wide text-zinc-900">SELECTED</span>
             <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm">
                 <span className={`h-2 w-2 rounded-full ${status.dot}`} />
                 <span className="font-semibold">{selected.name}</span>
@@ -157,62 +165,63 @@ function ControlView({ state, onError }) {
             </div>
         </div>
     );
-    const tiles = (
-        <Step number={1} title="Pick a camera">
-            <CameraTiles
-                cameras={cameras}
-                statuses={statuses}
-                video={video}
-                tracking={tracking}
-                selectedId={selected.id}
-                live={atem.live}
-                next={atem.next}
-                onSelect={(id) => window.ptz.setUi({ selectedCameraId: id })}
-            />
-        </Step>
-    );
 
     return (
-        <div className="flex flex-col gap-4 p-5">
-            {withAtem ? (
-                <>
-                    {/* With an ATEM: the selected camera beside what is on air. */}
-                    <div className="grid grid-cols-2 gap-5 self-start" style={{ width: 'min(100%, calc(27vh * 32 / 9 + 1.25rem))' }}>
-                        {selectedView}
+        <div className="flex h-full min-h-[680px] flex-col gap-3 p-4">
+            {/* Big views, like OBS studio mode: they take all the height the
+                controls below do not need, and stay 16:9. */}
+            <div className={`grid min-h-[200px] flex-1 gap-4 ${withAtem ? 'grid-cols-2' : 'grid-cols-1'}`} data-testid="views">
+                <Fit>{selectedView}</Fit>
+                {withAtem && (
+                    <Fit>
                         <LiveView atem={atem} cameras={cameras} video={video} />
+                    </Fit>
+                )}
+            </div>
+
+            <div className="flex items-center gap-4">
+                <StepLabel number={1} title="Pick a camera" />
+                <CameraTiles
+                    cameras={cameras}
+                    statuses={statuses}
+                    video={video}
+                    tracking={tracking}
+                    selectedId={selected.id}
+                    live={atem.live}
+                    next={atem.next}
+                    onSelect={(id) => window.ptz.setUi({ selectedCameraId: id })}
+                />
+            </div>
+
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-stretch gap-4">
+                <div className="flex flex-col gap-2 rounded-2xl border border-edge bg-panel p-4">
+                    <div className="flex items-center gap-3">
+                        <StepLabel number={2} title={`Frame ${selected.name}`} />
+                        {live && (
+                            <span data-testid="live-note" className="rounded bg-live px-2 py-0.5 text-[11px] font-bold tracking-wide text-white">
+                                LIVE · moves will be seen
+                            </span>
+                        )}
                     </div>
-                    {tiles}
-                </>
-            ) : (
-                <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
-                    {selectedView}
-                    {tiles}
+                    <FramePanel
+                        camera={selected}
+                        profile={profile}
+                        online={status.state === 'online'}
+                        trackingOn={Boolean(tracking[selected.id])}
+                        power={statuses[selected.id]?.power ?? null}
+                        live={live}
+                        exposureOpen={exposureOpen}
+                        onToggleExposure={() => setExposureOpen((o) => !o)}
+                        speed={settings.ui.speed}
+                        onError={onError}
+                    />
                 </div>
-            )}
 
-            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-6">
-                <Step number={2} title={`Frame ${selected.name}`}>
-                    <div className="rounded-2xl border border-edge bg-panel p-5">
-                        <FramePanel
-                            camera={selected}
-                            profile={profile}
-                            online={status.state === 'online'}
-                            live={atem.live.includes(selected.id)}
-                            trackingOn={Boolean(tracking[selected.id])}
-                            power={statuses[selected.id]?.power ?? null}
-                            exposureOpen={exposureOpen}
-                            onToggleExposure={() => setExposureOpen((o) => !o)}
-                            speed={settings.ui.speed}
-                            onError={onError}
-                        />
-                    </div>
-                </Step>
-
-                <div className="mt-8 rounded-2xl border border-edge bg-panel p-5">
+                <div className="rounded-2xl border border-edge bg-panel p-4">
                     {exposureOpen ? (
                         <ExposurePanel
                             camera={selected}
-                            live={atem.live.includes(selected.id)}
+                            live={live}
                             disabled={status.state !== 'online' || statuses[selected.id]?.power === 'standby'}
                             onClose={() => setExposureOpen(false)}
                             onError={onError}

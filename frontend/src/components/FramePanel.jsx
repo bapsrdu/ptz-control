@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Home, Moon, PersonStanding, Power, Rabbit, Radio, SunMedium, Turtle } from 'lucide-react';
+import { Home, Moon, PersonStanding, Power, Rabbit, SunMedium, Turtle } from 'lucide-react';
 import Joystick from './Joystick.jsx';
 import ZoomSlider from './ZoomSlider.jsx';
 import HoldButton from './HoldButton.jsx';
@@ -11,14 +11,7 @@ const SPEED_DEFAULT = 0.5;
 export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
     const [focusMode, setFocusMode] = useState({}); // cameraId -> 'auto' | 'manual'
     const [localSpeed, setLocalSpeed] = useState(speed);
-    // Moving a camera that is on air needs a deliberate "allow" first. It
-    // locks again when the camera goes off air or another camera is picked.
-    const [allowedLive, setAllowedLive] = useState(null);
-    const locked = live && allowedLive !== camera.id;
 
-    useEffect(() => {
-        if (!live) setAllowedLive(null);
-    }, [live]);
     const mode = focusMode[camera.id] ?? 'auto';
     const focus = useDrive({
         send: (id, dir) => window.ptz.focus(id, dir),
@@ -46,7 +39,7 @@ export default function FramePanel({ camera, profile, online, power = null, live
     }
 
     const standby = power === 'standby';
-    const disabled = !online || locked || standby;
+    const disabled = !online || standby;
 
     async function setPower(on) {
         if (!on && !window.confirm(`Put ${camera.name} in standby?${live ? `\n\n${camera.name} is live: it will turn away from the shot.` : '\n\nIt will turn to its rest position.'}`)) return;
@@ -63,21 +56,6 @@ export default function FramePanel({ camera, profile, online, power = null, live
                     <button type="button" onClick={() => setPower(true)} className="ml-auto shrink-0 rounded-lg bg-accent px-3 py-1 font-semibold text-zinc-900 hover:bg-sky-200">
                         Wake up
                     </button>
-                </div>
-            )}
-            {live && !standby && (
-                <div data-testid="live-guard" className={`flex items-center gap-3 rounded-xl border px-4 py-2 text-sm ${locked ? 'border-live/60 bg-live/15 text-red-100' : 'border-live/40 text-red-200'}`}>
-                    <Radio size={18} className="shrink-0 text-live" />
-                    {locked ? (
-                        <>
-                            <span><b>{camera.name} is live.</b> Any movement will be seen on screen.</span>
-                            <button type="button" onClick={() => setAllowedLive(camera.id)} className="ml-auto shrink-0 rounded-lg bg-live px-3 py-1 font-semibold text-white hover:bg-red-400">
-                                Allow moving
-                            </button>
-                        </>
-                    ) : (
-                        <span>Moving {camera.name} while it is live.</span>
-                    )}
                 </div>
             )}
             <div className="flex items-center gap-6">

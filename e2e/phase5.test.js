@@ -34,7 +34,7 @@ test('tracking turns off when the operator moves the camera; exposure; standby a
     });
     const page = await app.firstWindow();
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.textContent.includes('Connected')));
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.dataset.state === 'online'));
     const [left] = cams;
 
     // --- Tracking hand-off ---------------------------------------------------

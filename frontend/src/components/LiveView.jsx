@@ -11,7 +11,7 @@ export default function LiveView({ atem, cameras, video }) {
     const cols = liveCameras.length > 1 ? 'grid-cols-2' : 'grid-cols-1';
 
     return (
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-live bg-black" data-testid="live-view">
+        <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-live bg-black" data-testid="live-view">
             {connected && liveCameras.length > 0 ? (
                 <div className={`grid h-full w-full ${cols} gap-0.5`}>
                     {liveCameras.map((c) => (

@@ -69,7 +69,7 @@ test('LIVE and NEXT, tally lights, live-camera guard and lower thirds', async (t
             return sum / (d.length / (4 * 97)) / 3 > 30;
         }), `video on tile ${i + 1}`, 15000);
     }
-    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.textContent.includes('Connected')));
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.dataset.state === 'online'));
 
     // Centre on M/E 2 program, Right on preview. The screens show M/E 1 (input 1).
     await atem('cut', 1, 4);
@@ -87,43 +87,39 @@ test('LIVE and NEXT, tally lights, live-camera guard and lower thirds', async (t
     await until(() => lastTally(cams[0]).red === RED_ON, 'Left tally red');
     await page.getByTestId('live-view').getByText('Left').waitFor();
     await page.getByTestId('live-view').getByText('Centre').waitFor();
-    if (shots) await page.screenshot({ path: path.join(shots, '08-atem-two-live.png') });
+    if (shots) {
+        await page.screenshot({ path: path.join(shots, '08-atem-two-live.png') });
+        // A full-HD control-room screen: the views should grow to use it.
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.waitForTimeout(500);
+        await page.screenshot({ path: path.join(shots, '08b-atem-1080p.png') });
+        await page.setViewportSize({ width: 1280, height: 900 });
+    }
 
-    // The live camera is locked until the operator allows it.
+    // A live camera can be moved straight away; a red note says it is live.
     await tile('Centre').click();
-    await page.getByTestId('live-guard').getByText('Centre is live.').waitFor();
+    await page.getByTestId('live-note').waitFor();
     cams[1].clearLog();
     const pad = await page.getByTestId('joystick').boundingBox();
     await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
     await page.mouse.down();
     await page.mouse.move(pad.x + pad.width - 5, pad.y + pad.height / 2, { steps: 3 });
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    assert.equal(cams[1].received.filter((h) => h.startsWith('81 01 06 01') && !h.endsWith('03 03 FF')).length, 0, 'locked camera must not move');
-    if (shots) await page.screenshot({ path: path.join(shots, '09-live-guard.png') });
-
-    await page.getByRole('button', { name: 'Allow moving' }).click();
-    await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(pad.x + pad.width - 5, pad.y + pad.height / 2, { steps: 3 });
     await page.waitForTimeout(200);
     await page.mouse.up();
-    await until(() => cams[1].received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('02 03 FF')), 'drive after allowing');
+    await until(() => cams[1].received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('02 03 FF')), 'live camera moves without unlocking');
+    if (shots) await page.screenshot({ path: path.join(shots, '09-live-camera.png') });
 
-    // Recalling a shot on a live camera asks first.
+    // Recalling a shot on a live camera goes straight through, no question.
     cams[1].clearLog();
-    const centreRow = page.getByTestId('shots-row').filter({ hasText: 'Centre' });
-    page.once('dialog', (d) => d.dismiss());
-    await centreRow.getByRole('button', { name: 'Pulpit' }).click();
-    await page.waitForTimeout(300);
-    assert.ok(!cams[1].received.includes('81 01 04 3F 02 01 FF'), 'dismissed: no recall');
-    page.once('dialog', (d) => d.accept());
-    await centreRow.getByRole('button', { name: 'Pulpit' }).click();
-    await until(() => cams[1].received.includes('81 01 04 3F 02 01 FF'), 'recall after confirming');
+    let asked = false;
+    page.once('dialog', (d) => { asked = true; d.dismiss(); });
+    await page.getByTestId('shots-row').filter({ hasText: 'Centre' }).getByRole('button', { name: 'Pulpit' }).click();
+    await until(() => cams[1].received.includes('81 01 04 3F 02 01 FF'), 'recall on a live camera');
+    assert.equal(asked, false);
 
-    // Off air again: the guard goes away and tally turns off.
+    // Off air again: the note goes away and tally turns off.
     await atem('cut', 1, 15);
-    await page.getByTestId('live-guard').waitFor({ state: 'detached' });
+    await page.getByTestId('live-note').waitFor({ state: 'detached' });
     await until(() => lastTally(cams[1]).red === RED_OFF, 'Centre tally off');
 
     // Lower thirds: the only thing the app may change on the ATEM.

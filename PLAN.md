@@ -150,8 +150,10 @@ camera's tracker or the app's tracker, never both.
 5. Named presets per camera with save, recall, rename, delete and a thumbnail
    picture taken when saved.
 6. Tracking on/off per camera, with an icon on the thumbnail.
-7. Guard on the live camera: when an ATEM is connected, moving the live camera
-   or recalling a preset on it needs an extra confirmation.
+7. Live-camera warning: when an ATEM is connected and the selected camera is
+   live, a red "LIVE · moves will be seen" note shows next to the controls.
+   It does not block anything. (An "Allow moving" lock was built in phase 4
+   and removed at the operators' request: it got in the way every time.)
 8. Connection status for each camera and the ATEM, with automatic reconnect.
 9. Export and import of all settings as one file, so a temple can back up its
    setup or copy it to another computer.
@@ -322,9 +324,10 @@ control once including Track Configuration, and export the log into `docs/`.
 - Camera tally lights: red LIVE, green NEXT, off otherwise. Only changes are
   sent, and they are re-sent when a camera reconnects. With no ATEM set up,
   tally lights are left alone.
-- Live-camera guard: the controls of a live camera are locked until the
-  operator presses "Allow moving", and lock again when it goes off air.
-  Recalling a shot on a live camera asks first.
+- Live-camera note: a red "LIVE · moves will be seen" tag beside the
+  controls. (First built as a lock with "Allow moving" and a question before
+  recalling a shot; both removed after on-site use because they slowed the
+  operators down.)
 - Lower thirds button in the top bar, showing the key's real state. Turning it
   on or off is the only ATEM write.
 - `sim/fake-atem.js` stands in for the switcher in tests (`PTZ_FAKE_ATEM=1`).
@@ -386,7 +389,9 @@ guide for other temples covering fixed camera addresses and the Test button.
   panning during a service is the worst failure this app can have.
 - The app must never change what is on air. The only ATEM write is the
   lower-third key on/off.
-- The ATEM is the source of truth for what is live. Do not keep a separate
+- The ATEM is the source of truth for what is live.
+- Do not add steps that block moving a live camera; operators asked for
+  warnings only. Do not keep a separate
   idea of "live" in the app.
 - Losing one camera, the video preview or the ATEM must not freeze the rest
   of the screen.

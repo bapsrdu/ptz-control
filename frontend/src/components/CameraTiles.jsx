@@ -17,9 +17,10 @@ export default function CameraTiles({ cameras, statuses, video, tracking, select
                         key={camera.id}
                         type="button"
                         data-testid="camera-tile"
+                        data-state={status.state}
                         aria-pressed={selected}
                         onClick={() => onSelect(camera.id)}
-                        className={`group w-40 overflow-hidden rounded-xl border-2 bg-panel-2 text-left ${selected ? 'border-accent' : isLive ? 'border-live/60' : 'border-transparent hover:border-edge'}`}
+                        className={`group w-36 overflow-hidden rounded-xl border-2 bg-panel-2 text-left ${selected ? 'border-accent' : isLive ? 'border-live/60' : 'border-transparent hover:border-edge'}`}
                     >
                         <div className="relative flex aspect-video items-center justify-center bg-black/40">
                             <VideoView cameraId={camera.id} status={video?.[camera.id]} />
@@ -33,9 +34,12 @@ export default function CameraTiles({ cameras, statuses, video, tracking, select
                             )}
                         </div>
                         <div className="flex items-center gap-2 px-2.5 py-2">
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} />
+                            <span title={status.label} aria-label={status.label} role="img" className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} />
                             <span className="truncate text-sm font-semibold">{camera.name}</span>
-                            <span className="ml-auto shrink-0 text-[11px] text-zinc-400">{status.state === 'online' && status.power === 'standby' ? 'Standby' : status.label}</span>
+                            {/* The green dot already says "connected"; only words for problems. */}
+                            {(status.state !== 'online' || status.power === 'standby') && (
+                                <span className="ml-auto shrink-0 text-[11px] text-zinc-400">{status.state === 'online' ? 'Standby' : status.label}</span>
+                            )}
                         </div>
                     </button>
                 );
