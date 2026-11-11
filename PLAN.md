@@ -1,45 +1,81 @@
 # Temple PTZ Control: build plan
 
-A desktop app (Windows and Mac) that lets one volunteer run three BZBGEAR
-BG-ADAMO-4KND25X cameras and a Blackmagic ATEM switcher from a single screen.
-Modelled on the Churchfront "CueVideo" demo video.
+A desktop app (Windows and Mac) that lets one volunteer frame and recall shots
+on a temple's PTZ cameras from a single screen. It is built first for BAPS
+Raleigh and then shared with other temples, which may have one camera or
+several. Modelled on the Churchfront "CueVideo" demo video.
 
 This document is the brief for whoever builds the app. Build the phases in
 order. Each phase ends with something that can be run and checked.
 
-## 1. What the reference app does
+## 1. Decisions already made
+
+| Topic | Decision |
+|---|---|
+| App shape | A separate app in this repo, not a page inside Broadcast Controller |
+| Cameras | Added by the user in the app: name, address, port. Nothing about a temple's network is written into the code. Any number of cameras, from one upward |
+| Switching | The app does not switch. No CUT, FADE or BLACK. A person switches on the ATEM as today |
+| ATEM link | Optional. When connected it is used to show what is live and next, drive camera tally lights, and turn the lower-third key on and off |
+| Lower thirds | One on/off button for the ATEM key that carries Broadcast Controller's output. Names and text are still cued in Broadcast Controller |
+| Tracking | The camera's built-in tracking first. App-side tracking is an optional last phase |
+| Platforms | Windows and Mac |
+
+## 2. What the reference app does
 
 Taken from the video and its narration. The layout reads top to bottom as three
 numbered steps.
 
-| Area | What it shows |
+| Area | What it shows | In our app |
+|---|---|---|
+| Top left, green border | Large preview of the "next" camera | Large view of the selected camera |
+| Top right, red border | Large view of what is live | Large view of the live camera, when an ATEM is connected |
+| Step 1 "Pick what's next" | Row of live thumbnails with LIVE and NEXT badges and a tracking icon | Same row, one tile per camera the user has added. Clicking a tile selects that camera for control. It does not change the ATEM |
+| Step 2 "Frame Cam N" | Joystick, zoom slider, speed slider with Reset, Focus, Tracking toggle with Close / Waist / Full, Exposure | Same, except Close / Waist / Full only exists with app-side tracking (phase 7) |
+| Step 3 "Take it live" | FADE, CUT, BLACK, LOWER THIRDS | Only the LOWER THIRDS on/off button |
+| Shots panel | One row per camera with named preset buttons and a "+" to save | Same |
+
+The video's app always drives the "next" camera so a volunteer cannot move the
+one on air. Ours lets the operator select any camera, and guards the live one
+instead (feature 7).
+
+## 3. The Raleigh setup
+
+From the BAPS Raleigh video routing diagram, version 3.0. This is the first
+site and the test case. None of it is written into the code.
+
+- Switcher: Blackmagic ATEM 2 M/E Constellation HD, on the network.
+- Three BZBGEAR BG-ADAMO-4KND25X cameras, each with SDI to the ATEM and a
+  network cable.
+
+| ATEM input | Source |
 |---|---|
-| Top left, green border | Large preview of the camera that is "next" |
-| Top right, red border | Large view of what is live |
-| Step 1 "Pick what's next" | A row of small live thumbnails: Cam 1, Cam 2, Cam 3, Graphics. Badges mark LIVE (red) and NEXT (green). An icon shows which cameras are tracking. Clicking a thumbnail makes it "next" |
-| Step 2 "Frame Cam N" | Controls for the "next" camera: a round joystick, a vertical zoom slider, a speed slider (turtle to rabbit, e.g. 1.6x) with Reset, a Focus button, a Tracking toggle with Close / Waist / Full framing and a tracking speed, and an Exposure button |
-| Step 3 "Take it live" | A big red FADE button, plus CUT, BLACK and LOWER THIRDS |
-| Shots panel, bottom left | One row per camera with named preset buttons (for example "Home") and a "+" to save the current position. A label marks the shot a camera is sitting on |
+| 1, 2 | PC01 (Resolume Arena), two feeds |
+| 3 | PTZ Left |
+| 4 | PTZ Center |
+| 5 | PTZ Right |
+| 7 | Ronin |
+| 8 | Camcorder |
+| 9 | Resolume Confidence |
+| 10 to 13 | Patch Panel 1 to 4 |
+| 14 | Stage Input (HDMI) |
+| 15 | PC02 |
+| 16 | Apple TV |
+| 17 | PTZ Mandir |
+| 18 | LED Novastar multiview |
+| 19 | HyperDeck |
+| 20 | Axis Center |
 
-The key idea is that the joystick always drives the "next" camera, never the
-live one, so a volunteer cannot move a camera that is on air by accident.
+Inputs 17 and 20 are further cameras. If they accept VISCA they can be added in
+the app like any other. If not, they simply do not appear.
 
-## 2. How this differs for our cameras
+Lower thirds come from Broadcast Controller
+(`amlakhani/Broadcast-Controller-Public`) on the VFX computer, which reaches
+the ATEM by SDI. Which input and which keyer carry it is chosen in settings.
 
-- The video uses Canon cameras with no tracking of their own, so that app finds
-  the person on the Mac and steers the camera. Our BZB cameras track by
-  themselves. The app turns that on and off.
-- The camera's own tracking offers two modes (Presenter, Zone) and a Headroom
-  setting (Low / Medium / High). It has no Close / Waist / Full framing. Those
-  three buttons only exist if we build app-side tracking (phase 7).
-- The camera's tracking algorithm cannot be improved from outside. The choice
-  per camera is either the camera's tracker or the app's tracker, not both at
-  once. See phase 7.
-
-## 3. Facts about the camera
+## 4. Facts about the BZB camera
 
 From the BG-ADAMO-4KND product manual. Items marked "verify" are not stated
-clearly in the manual and must be confirmed on a real camera in phase 0.
+clearly in the manual and must be confirmed on a real camera.
 
 | Item | Value |
 |---|---|
@@ -77,155 +113,180 @@ Replies: `90 41 FF` accepted, `90 51 FF` done, `90 60 02 FF` syntax error,
 `90 61 41 FF` cannot run now.
 
 Not available over VISCA, only on the camera's web page: tracking mode
-(Presenter / Zone), headroom, zone setup, "tracking lost" preset, picture style,
-brightness and contrast sliders, SD card recording. These are phase 6.
+(Presenter / Zone), headroom (Low / Medium / High), zone setup, "tracking lost"
+preset, picture style, brightness and contrast sliders, SD card recording.
+These are phase 6.
 
-## 4. Features
+The camera's own tracking has no Close / Waist / Full framing, and its
+algorithm cannot be improved from outside. Per camera, steering comes from the
+camera's tracker or the app's tracker, never both.
+
+## 5. Features
 
 **Must have**
 
-1. Live thumbnails of all three cameras, plus large Next and Live views.
-2. Click a camera to make it "next". Joystick, zoom and focus drive that camera.
-3. Speed slider for joystick and zoom.
-4. Named presets per camera with save, recall, rename, delete and a thumbnail
+1. Add, edit, remove and reorder cameras in the app. Each camera has a name,
+   address, VISCA port (default 1259) and optional preview address. The screen
+   lays itself out for one camera or many.
+2. A "Test" button when adding a camera. It finds the working VISCA transport
+   by itself (UDP or TCP, with or without the 8-byte header), saves it with the
+   camera, and says in plain words what failed if nothing answers.
+3. Live thumbnail of every camera, plus a large view of the selected one.
+4. Joystick, zoom, focus and a speed slider for the selected camera.
+5. Named presets per camera with save, recall, rename, delete and a thumbnail
    picture taken when saved.
-5. CUT, FADE and BLACK through the ATEM. Live and Next always mirror the ATEM,
-   including when someone presses buttons on the ATEM itself.
 6. Tracking on/off per camera, with an icon on the thumbnail.
-7. Guard on the live camera: moving it or recalling a preset on it needs an
-   extra confirmation.
+7. Guard on the live camera: when an ATEM is connected, moving the live camera
+   or recalling a preset on it needs an extra confirmation.
 8. Connection status for each camera and the ATEM, with automatic reconnect.
+9. Export and import of all settings as one file, so a temple can back up its
+   setup or copy it to another computer.
 
-**Should have**
+**Should have, needs the ATEM link**
 
-9. Camera tally lights follow the ATEM: red when live, green when next.
-10. Lower thirds on/off (ATEM upstream or downstream key).
-11. Exposure panel: mode, exposure compensation, backlight, white balance.
-12. Keyboard shortcuts: 1/2/3 pick next, Space cut, Enter fade, arrows move.
-13. Settings screen for camera names, addresses and ATEM input numbers.
+10. ATEM settings: address, which M/E row to watch, which ATEM input each
+    camera is on, and which keyer carries the lower thirds.
+11. LIVE and NEXT badges on the thumbnails, mirrored from the ATEM.
+12. Camera tally lights follow the ATEM: red when live, green when next. Can be
+    switched off in settings.
+13. LOWER THIRDS on/off button for the chosen keyer, showing its real state.
+
+**Should have, camera only**
+
+14. Exposure panel: mode, exposure compensation, backlight, white balance.
+15. Keyboard shortcuts: number keys select a camera, arrows move, plus and
+    minus zoom.
+16. Camera power: wake and standby, per camera and for all.
 
 **Later**
 
-14. Tracking mode, headroom and zones from the camera web page (phase 6).
-15. App-side tracking with Close / Waist / Full framing (phase 7).
-16. Use from a tablet browser on the same network.
+17. Tracking mode, headroom and zones from the camera web page (phase 6).
+18. App-side tracking with Close / Waist / Full framing (phase 7).
+19. Use from a tablet browser on the same network.
+20. Find cameras on the network automatically.
 
-## 5. Technology
+With no ATEM configured, features 7 and 10 to 13 are hidden and the app is a
+plain camera controller.
 
-- **Electron + React + TypeScript**, built with Vite. One codebase for Windows
-  and Mac.
-- **ATEM**: the `atem-connection` npm package.
+## 6. Technology
+
+Match Broadcast Controller, so the two apps share habits and code can move
+between them.
+
+- **Electron + React + Vite**, plain JavaScript with ES modules, Tailwind CSS,
+  tests with `node --test`.
+- **ATEM**: the `atem-connection` package. Start from Broadcast Controller's
+  `atem_service.js`, which already handles connect, reconnect, state mirroring
+  and keyers, and keep only what this app needs. Several clients can connect
+  to one ATEM, so both apps can run at once.
 - **Cameras**: a small VISCA client written in the app, using Node `dgram` and
-  `net`. No library needed.
+  `net`. Keep it generic VISCA with the BZB specifics (tracking and tally
+  bytes) in one "camera profile" file, so another camera brand can be added as
+  a second profile later.
 - **Preview video**: bundle the `go2rtc` binary and run it as a child process.
   It pulls each camera's RTSP sub stream and serves it to the app window as
-  WebRTC, with under half a second of delay. The Live view is whichever camera
-  the ATEM has on program. Non-camera inputs such as Graphics show a labelled
-  tile, not video.
-- **Settings and presets**: one JSON file in the user's app-data folder. Preset
-  positions are stored in the camera itself, so the IR remote and the camera web
-  page keep working. The JSON file holds each preset's name, number and
+  WebRTC, with under half a second of delay. The preview address is filled in
+  from the camera address by the profile and can be overridden.
+- **Settings and presets**: JSON files in Electron's `userData` folder. Preset
+  positions are stored in the camera itself, so the IR remote and the camera
+  web page keep working. The JSON holds each preset's name, number and
   thumbnail.
 - **Packaging**: `electron-builder`, producing a Windows installer and a Mac
-  `.dmg`.
+  `.dmg`. Copy the GitHub Actions build workflows from Broadcast Controller.
+  This app has no native modules, so those builds are simpler.
 
-All network code runs in the Electron main process. The window talks to it over
-a typed IPC interface, so the user interface never opens sockets itself.
+All network code runs in the Electron main process. The window talks to it
+over IPC through a preload script and never opens sockets itself.
 
 ```
-src/main/visca/      VISCA client, command builders, per-camera queue
-src/main/atem/       ATEM wrapper, state mirror, tally sync
-src/main/video/      go2rtc process and its config
-src/main/store/      settings and presets JSON
-src/main/ipc.ts      typed channel between main and window
-src/renderer/        React screens and components
-sim/                 fake camera and fake ATEM for testing
+main.js                  Electron main process
+src/main/visca/          VISCA client, command builders, per-camera queue
+src/main/profiles/       camera profiles (bzb-adamo.js first)
+src/main/atem/           trimmed ATEM service, tally sync
+src/main/video/          go2rtc process and its config
+src/main/store/          settings and presets JSON, export/import
+frontend/src/            React screens and components
+sim/                     fake camera and fake ATEM for testing
+tests/                   node --test suite
 ```
 
-## 6. Phases
+## 7. Phases
 
-### Phase 0: checks at the temple (needs a person on site)
+### Phase 1: skeleton, settings and simulators
 
-The build environment cannot reach the cameras, so these answers have to come
-from the temple network.
+- Project setup as in section 6, with lint and tests running in CI.
+- Camera list in settings: add, edit, remove, reorder.
+- `sim/fake-camera`: answers VISCA on a chosen port, keeps pan, tilt, zoom and
+  presets in memory, logs each command. It can be started in each of the four
+  transport modes.
+- `sim/fake-atem`, or a mock behind the ATEM service's interface.
 
-1. Give each camera a fixed address and turn DHCP off. Write down the three
-   addresses and the ATEM's address and model.
-2. Run `tools/visca-probe` (built in phase 1) against one camera. It tries UDP
-   and TCP on port 1259, with and without the 8-byte header, sends a
-   zoom-position query and reports which combination answers.
-3. Open one camera's web page in Chrome with DevTools on the Network tab. Use
-   every control once, including Track Configuration, then save the log as a
-   HAR file and add it to `docs/`. This is the source for phase 6.
-4. Confirm `rtsp://IP:554/live/av1` plays in VLC.
+Done when: the app opens with no cameras, a camera can be added, and the
+screen shows the right number of tiles for one, three and six cameras.
 
-### Phase 1: skeleton and simulators
+### Phase 2: camera connection, movement and presets
 
-- Electron + Vite + React + TypeScript project, lint and unit test setup.
-- `sim/fake-camera`: answers VISCA on port 1259, keeps pan, tilt, zoom and
-  presets in memory, logs each command.
-- `sim/fake-atem`, or a mock behind the ATEM wrapper's interface.
-- `tools/visca-probe` as described above.
-- Settings file with the three cameras and the ATEM.
-
-Done when: the app opens, shows three empty camera tiles, and the probe gets an
-answer from the fake camera.
-
-### Phase 2: camera movement and presets
-
-- VISCA client with one command queue per camera, reply handling, timeouts and
-  reconnect. The transport (UDP/TCP, header or not) is a setting, filled in from
-  phase 0.
+- VISCA client with one command queue per camera, reply handling, timeouts
+  and reconnect.
+- The "Test" button and transport detection from feature 2.
 - Joystick: drag distance sets speed, release sends Stop. Send a new move
   command only when direction or speed changes, at most 10 per second. Always
-  send Stop on release, on window blur and on app quit.
-- Zoom slider that springs back to centre, focus auto/manual with near and far.
-- Speed slider scaling pan, tilt and zoom speeds.
+  send Stop on release, on window blur, on camera change and on app quit.
+- Zoom slider that springs back to centre, focus auto/manual with near and
+  far, and the speed slider.
 - Shots panel: save, recall, rename, delete.
 
-Done when: every control produces the expected bytes in the fake camera's log,
-checked by unit tests.
+Done when: every control produces the expected bytes in the fake camera's
+log, in all four transport modes, checked by tests.
+
+### On-site check 1 (needs a person at the temple)
+
+Install the phase 2 build at Raleigh. Give each camera a fixed address with
+DHCP off, add the three cameras, press Test, and confirm pan, tilt, zoom and a
+preset work. Record which transport was detected in
+`docs/ON-SITE-CHECKLIST.md`. Also save a HAR file for phase 6: open one
+camera's web page in Chrome with DevTools on the Network tab, use every
+control once including Track Configuration, and export the log into `docs/`.
 
 ### Phase 3: preview video
 
-- Start go2rtc with a generated config for the three sub streams. Restart it if
-  it exits.
-- Thumbnails and the Next view play over WebRTC. Show a clear "no video" tile
-  when a stream is down.
+- Start go2rtc with a config generated from the camera list. Regenerate and
+  restart it when cameras change, and restart it if it exits.
+- Thumbnails and the large view play over WebRTC. Show a clear "no video" tile
+  when a stream is down. Camera control must keep working without video.
 - Capture a still frame when a preset is saved and use it as the thumbnail.
 
-### Phase 4: ATEM
+### Phase 4: ATEM link
 
-- Connect, mirror program and preview, map ATEM inputs to cameras in settings.
-- Clicking a thumbnail sets ATEM preview. CUT, FADE (auto transition) and BLACK
-  (fade to black) buttons.
-- Lower thirds toggle on a key chosen in settings.
-- Tally sync to the cameras.
-- Live-camera guard from feature 7.
+- ATEM settings from feature 10. Connect, mirror program and preview on the
+  chosen M/E.
+- LIVE and NEXT badges, the large Live view, tally sync, the live-camera
+  guard and the LOWER THIRDS button.
+- The app never changes program or preview, and never runs a transition.
 
 ### Phase 5: tracking toggle and exposure
 
-- Tracking on/off per camera. Turn tracking off automatically when the operator
-  touches the joystick or recalls a preset on that camera, and show that it
-  happened.
-- Exposure panel from feature 11.
+- Tracking on/off per camera. Turn tracking off automatically when the
+  operator touches the joystick or recalls a preset on that camera, and show
+  that it happened.
+- Exposure panel and camera power.
 
 ### Phase 6: web-page-only features
 
-Using the HAR file from phase 0, add tracking mode, headroom, zone setup,
-"tracking lost" preset and picture style. If the camera requires a login for
-these calls, store the password with Electron `safeStorage`, not in the JSON
-file.
+Using the HAR file, add tracking mode, headroom, zone setup, "tracking lost"
+preset and picture style to the BZB profile. If the camera requires a login
+for these calls, add username and password fields to the camera and store the
+password with Electron `safeStorage`, not in the JSON file.
 
 ### Phase 7 (optional): app-side tracking
 
 Only build this if the camera's tracking proves not good enough in real
 services.
 
-- Run a person-detection model on the preview stream inside the app. Good open
-  options: Google MediaPipe Pose Landmarker (Apache 2.0, runs in the window with
-  no extra install) or a YOLO pose model through ONNX Runtime. Check the YOLO
-  model's licence before shipping it.
+- Run a person-detection model on the preview stream inside the app. Good
+  open options: Google MediaPipe Pose Landmarker (Apache 2.0, runs in the
+  window with no extra install) or a YOLO pose model through ONNX Runtime.
+  Check the YOLO model's licence before shipping it.
 - Steer with VISCA move commands from a simple control loop: keep the chosen
   body point at a target place in the frame, with a dead zone in the middle so
   the camera does not twitch.
@@ -236,26 +297,35 @@ services.
 - Expect several services' worth of tuning. The sub stream is small and has
   delay, so this will react more slowly than the camera's own tracker.
 
-### Phase 8: packaging
+### Phase 8: packaging and hand-out
 
-Installers for Windows and Mac, an app icon, and a one-page volunteer guide.
+Installers for Windows and Mac, an app icon, export/import of settings, a
+first-run screen that leads straight to "Add a camera", and a short setup
+guide for other temples covering fixed camera addresses and the Test button.
 
-## 7. Rules for the builder
+## 8. Rules for the builder
 
-- Never send a move command without a matching Stop path. A camera left panning
-  during a service is the worst failure this app can have.
-- The ATEM is the source of truth for what is live. Do not keep a separate idea
-  of "live" in the app.
-- Losing one camera or the ATEM must not freeze the rest of the screen.
+- No address, port, input number or camera count from section 3 may appear in
+  the code. Everything site-specific comes from settings.
+- Never send a move command without a matching Stop path. A camera left
+  panning during a service is the worst failure this app can have.
+- The app must never change what is on air. The only ATEM write is the
+  lower-third key on/off.
+- The ATEM is the source of truth for what is live. Do not keep a separate
+  idea of "live" in the app.
+- Losing one camera, the video preview or the ATEM must not freeze the rest
+  of the screen.
 - No cloud services, accounts or internet access. Everything stays on the
   temple network.
-- Test against the simulators in this environment. Anything that could only be
-  confirmed on real hardware goes into `docs/ON-SITE-CHECKLIST.md`.
+- Test against the simulators in this environment. Anything that could only
+  be confirmed on real hardware goes into `docs/ON-SITE-CHECKLIST.md`.
 
-## 8. Still to confirm
+## 9. Still to confirm
 
-- ATEM model and address, and which input each camera and the graphics computer
-  are on.
-- Results of the phase 0 probe and the HAR file.
-- Whether lower thirds come from an ATEM key or from another program.
+- Which ATEM input and which keyer (upstream or downstream, and its number)
+  carry Broadcast Controller's lower thirds at Raleigh.
+- Which M/E row feeds the live stream at Raleigh.
+- Results of on-site check 1 and the HAR file.
 - Camera firmware version, shown on the web page under System, Update.
+- Whether "PTZ Mandir" (input 17) and "Axis Center" (input 20) should be
+  controlled too, and what models they are.
