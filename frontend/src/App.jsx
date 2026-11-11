@@ -8,15 +8,17 @@ import { statusOf } from './components/status.js';
 import VideoView from './components/VideoView.jsx';
 import LiveView from './components/LiveView.jsx';
 import LowerThirdsButton from './components/LowerThirdsButton.jsx';
+import ExposurePanel from './components/ExposurePanel.jsx';
 
 export default function App() {
     const [state, setState] = useState(null);
     const [view, setView] = useState({ name: 'control' }); // or { name: 'settings', adding }
     const [toasts, setToasts] = useState([]);
 
-    const showError = useCallback((message) => {
+    // kind: 'error' (red) or 'info' (blue).
+    const showError = useCallback((message, kind = 'error') => {
         const id = Math.random().toString(36).slice(2);
-        setToasts((t) => [...t.slice(-2), { id, message }]);
+        setToasts((t) => [...t.slice(-2), { id, message, kind }]);
         setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
     }, []);
 
@@ -24,7 +26,7 @@ export default function App() {
         let alive = true;
         window.ptz.getState().then((s) => alive && setState(s));
         const offState = window.ptz.onState(setState);
-        const offNotice = window.ptz.onNotice(({ message }) => showError(message));
+        const offNotice = window.ptz.onNotice(({ message, kind }) => showError(message, kind));
         return () => {
             alive = false;
             offState();
@@ -74,7 +76,7 @@ export default function App() {
 
             <div className="pointer-events-none fixed bottom-4 left-1/2 flex -translate-x-1/2 flex-col gap-2">
                 {toasts.map((t) => (
-                    <div key={t.id} role="alert" className="pointer-events-auto rounded-lg border border-red-500/40 bg-zinc-900 px-4 py-2 text-sm text-red-200 shadow-xl">
+                    <div key={t.id} role={t.kind === 'info' ? 'status' : 'alert'} className={`pointer-events-auto rounded-lg border bg-zinc-900 px-4 py-2 text-sm shadow-xl ${t.kind === 'info' ? 'border-sky-400/40 text-sky-100' : 'border-red-500/40 text-red-200'}`}>
                         {t.message}
                     </div>
                 ))}
@@ -135,6 +137,7 @@ function Step({ number, title, children }) {
 function ControlView({ state, onError }) {
     const { settings, statuses, tracking, profiles, video, atem } = state;
     const withAtem = Boolean(settings.atem.host);
+    const [exposureOpen, setExposureOpen] = useState(false);
     const cameras = settings.cameras;
     const selected = cameras.find((c) => c.id === settings.ui.selectedCameraId) ?? cameras[0];
     const status = statusOf(statuses, selected.id);
@@ -196,6 +199,9 @@ function ControlView({ state, onError }) {
                             online={status.state === 'online'}
                             live={atem.live.includes(selected.id)}
                             trackingOn={Boolean(tracking[selected.id])}
+                            power={statuses[selected.id]?.power ?? null}
+                            exposureOpen={exposureOpen}
+                            onToggleExposure={() => setExposureOpen((o) => !o)}
                             speed={settings.ui.speed}
                             onError={onError}
                         />
@@ -203,7 +209,17 @@ function ControlView({ state, onError }) {
                 </Step>
 
                 <div className="mt-8 rounded-2xl border border-edge bg-panel p-5">
-                    <ShotsPanel cameras={cameras} selectedId={selected.id} onlineIds={onlineIds} live={atem.live} next={atem.next} onError={onError} />
+                    {exposureOpen ? (
+                        <ExposurePanel
+                            camera={selected}
+                            live={atem.live.includes(selected.id)}
+                            disabled={status.state !== 'online' || statuses[selected.id]?.power === 'standby'}
+                            onClose={() => setExposureOpen(false)}
+                            onError={onError}
+                        />
+                    ) : (
+                        <ShotsPanel cameras={cameras} selectedId={selected.id} onlineIds={onlineIds} live={atem.live} next={atem.next} onError={onError} />
+                    )}
                 </div>
             </div>
         </div>

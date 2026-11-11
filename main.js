@@ -210,14 +210,44 @@ ipcMain.handle('atem:lowerThirds', (_e, on) => atem.setKeyer(store.get().atem.lo
 
 // --- Movement ---------------------------------------------------------------
 
+// When the operator moves a camera that is auto tracking, tracking is turned
+// off first, so the camera does not fight the operator. The tracking command
+// is queued ahead of the movement.
+const TAKEOVER_DEAD_ZONE = 0.12;
+function takeOver(id) {
+    if (!tracking.get(id)) return;
+    tracking.set(id, false);
+    pushState();
+    manager.tracking(id, false).then((out) => {
+        const name = camera(id)?.name ?? 'The camera';
+        if (!win || win.isDestroyed()) return;
+        win.webContents.send('notice', {
+            cameraId: id,
+            kind: out.ok ? 'info' : 'error',
+            message: out.ok
+                ? `Auto tracking turned off for ${name}, because you moved it.`
+                : `Could not turn off auto tracking for ${name}: ${out.message}`,
+        });
+        if (!out.ok) {
+            tracking.set(id, true);
+            pushState();
+        }
+    });
+}
+
 ipcMain.on('ptz:move', (_e, id, v) => {
-    if (isId(id)) manager.move(id, { x: unit(v?.x), y: unit(v?.y) }, speed());
+    if (!isId(id)) return;
+    const vector = { x: unit(v?.x), y: unit(v?.y) };
+    if (Math.abs(vector.x) > TAKEOVER_DEAD_ZONE || Math.abs(vector.y) > TAKEOVER_DEAD_ZONE) takeOver(id);
+    manager.move(id, vector, speed());
 });
 ipcMain.on('ptz:stopMove', (_e, id) => {
     if (isId(id)) manager.stopMove(id);
 });
 ipcMain.on('ptz:zoom', (_e, id, value) => {
-    if (isId(id)) manager.zoom(id, unit(value), speed());
+    if (!isId(id)) return;
+    if (Math.abs(unit(value)) > TAKEOVER_DEAD_ZONE) takeOver(id);
+    manager.zoom(id, unit(value), speed());
 });
 ipcMain.on('ptz:stopZoom', (_e, id) => {
     if (isId(id)) manager.stopZoom(id);
@@ -227,7 +257,30 @@ ipcMain.on('ptz:focus', (_e, id, dir) => {
 });
 ipcMain.on('ptz:stopAll', () => manager.stopAll());
 
-ipcMain.handle('ptz:home', (_e, id) => (camera(id) ? manager.home(id) : unknownCamera));
+ipcMain.handle('ptz:home', (_e, id) => {
+    if (!camera(id)) return unknownCamera;
+    takeOver(id);
+    return manager.home(id);
+});
+
+ipcMain.handle('ptz:exposure', (_e, id, action) => (camera(id) ? manager.exposure(id, action) : unknownCamera));
+ipcMain.handle('ptz:readExposure', (_e, id) => (camera(id) ? manager.readExposure(id) : unknownCamera));
+
+ipcMain.handle('ptz:power', (_e, id, on) => {
+    if (!camera(id)) return unknownCamera;
+    if (!on) tracking.delete(id);
+    return manager.power(id, Boolean(on));
+});
+
+ipcMain.handle('ptz:powerAll', async (_e, on) => {
+    const results = await Promise.all(store.get().cameras.map(async (c) => ({ name: c.name, ...(await manager.power(c.id, Boolean(on))) })));
+    const failed = results.filter((r) => !r.ok);
+    if (!on) tracking.clear();
+    pushState();
+    return failed.length
+        ? { ok: false, message: `Not every camera answered: ${failed.map((f) => f.name).join(', ')}.` }
+        : { ok: true };
+});
 
 ipcMain.handle('ptz:focusMode', (_e, id, mode) => {
     if (!camera(id)) return unknownCamera;
@@ -267,6 +320,7 @@ ipcMain.handle('preset:save', async (_e, cameraId, name, picture) => {
 ipcMain.handle('preset:recall', (_e, cameraId, presetId) => {
     const p = preset(cameraId, presetId);
     if (!p) return { ok: false, message: 'That shot no longer exists.' };
+    takeOver(cameraId);
     return manager.recallPreset(cameraId, p.number);
 });
 

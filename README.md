@@ -8,9 +8,10 @@ speaks standard VISCA over IP.
 Works on Windows and Mac. Cameras are added in the app, so the same install
 works at any temple with any number of cameras.
 
-The full plan is in [PLAN.md](PLAN.md). Phases 1 to 4 are built: adding
-cameras, moving them, saved shots, live video from each camera, and the
-optional ATEM link.
+The full plan is in [PLAN.md](PLAN.md). Phases 1 to 5 are built: adding
+cameras, moving them, saved shots, live video from each camera, the optional
+ATEM link, exposure and white balance, camera power, and turning auto
+tracking off when someone takes over.
 
 ## Using it
 
@@ -29,6 +30,14 @@ optional ATEM link.
    - press **+** in the Shots panel to save where a camera is pointing, and
      click a shot to send the camera back there. The shot button shows a
      small picture of what the camera saw.
+
+Picture: **Exposure** (next to the joystick) opens the exposure and white
+balance controls for the selected camera. **Standby** puts a camera to sleep;
+**Wake up** brings it back. Settings has Wake all and Standby all.
+
+Auto tracking: if a camera is tracking and someone moves it, zooms it, or
+sends it to a shot, tracking turns off by itself so the camera does not fight
+the operator.
 
 Video: each camera's tile and the large view show its live video. For BZB
 cameras this is the camera's sub stream, `rtsp://<IP>:554/live/av1`, found

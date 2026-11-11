@@ -80,3 +80,31 @@ test('a camera that cannot be found says why', async (t) => {
     assert.match(manager.statuses().c1.message, /did not answer/);
     assert.match((await manager.home('c1')).message, /did not answer/);
 });
+
+test('exposure changes, reading them back, and power', async (t) => {
+    const fake = await new FakeCamera({ mode: 'udp-raw' }).start();
+    const manager = new CameraManager({ ...fast, clientOptions: { commandTimeoutMs: 300, heartbeatMs: 100 } });
+    t.after(async () => { await manager.dispose(); await fake.stop(); });
+    manager.sync([{ id: 'c1', name: 'Left', host: '127.0.0.1', port: fake.port, profile: 'bzb-adamo', mode: 'udp-raw', presets: [] }]);
+    await waitFor(() => manager.statuses().c1?.power === 'on');
+
+    assert.deepEqual(await manager.exposure('c1', { type: 'aeMode', value: 'bright' }), { ok: true });
+    assert.deepEqual(await manager.exposure('c1', { type: 'step', setting: 'bright', dir: 'up' }), { ok: true });
+    assert.deepEqual(await manager.exposure('c1', { type: 'backlight', value: true }), { ok: true });
+    assert.deepEqual(await manager.exposure('c1', { type: 'wbMode', value: '5500K' }), { ok: true });
+    assert.equal((await manager.exposure('c1', { type: 'aeMode', value: 'night' })).ok, false);
+    assert.equal((await manager.exposure('c1', { type: 'rm -rf' })).ok, false);
+
+    const read = await manager.readExposure('c1');
+    assert.deepEqual(read.values, {
+        aeMode: 'bright', expCompOn: false, expComp: 7, backlight: true, wbMode: '5500K', iris: 10, shutter: 8, bright: 13,
+    });
+
+    assert.deepEqual(await manager.power('c1', false), { ok: true });
+    assert.equal(manager.statuses().c1.power, 'standby');
+    assert.equal(fake.state.power, false);
+    assert.match((await manager.home('c1')).message, /not executable/);
+    await manager.power('c1', true);
+    await waitFor(() => manager.statuses().c1.power === 'on');
+    assert.ok(fake.received.includes('81 01 04 00 03 FF') && fake.received.includes('81 01 04 00 02 FF'));
+});

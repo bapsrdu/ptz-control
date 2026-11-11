@@ -109,7 +109,10 @@ export class CameraManager extends EventEmitter {
             ...this.clientOptions,
         });
         entry.client = client;
-        client.on('status', (status) => this.#setStatus(entry, status));
+        client.on('status', (status) => this.#setStatus(entry, { ...status, power: entry.status.power ?? null }));
+        client.on('power', (power) => {
+            if (entry.status.power !== power) this.#setStatus(entry, { ...entry.status, power });
+        });
         client.start();
     }
 
@@ -260,6 +263,76 @@ export class CameraManager extends EventEmitter {
             this.#send(entry, greenCmd, { key: 'tally-green' }),
         ]);
         return results.find((r) => !r.ok) ?? { ok: true };
+    }
+
+    // Power: on = wake, off = standby. The heartbeat confirms the new state.
+    async power(id, on) {
+        const entry = this.#entry(id);
+        if (!entry) return { ok: false, message: 'Unknown camera.' };
+        if (!on) {
+            entry.channels.panTilt.stop();
+            entry.channels.zoom.stop();
+        }
+        const out = await this.#send(entry, on ? V.powerOn(ADDRESS) : V.powerStandby(ADDRESS));
+        if (out.ok) this.#setStatus(entry, { ...entry.status, power: on ? 'on' : 'standby' });
+        return out;
+    }
+
+    // One exposure or white balance change. action is one of:
+    //   { type: 'aeMode', value: 'auto' | 'manual' | 'shutter' | 'iris' | 'bright' }
+    //   { type: 'expCompOn', value: true | false }
+    //   { type: 'step', setting: 'expComp' | 'iris' | 'shutter' | 'bright', dir: 'up' | 'down' | 'reset' }
+    //   { type: 'backlight', value: true | false }
+    //   { type: 'wbMode', value: one of V.WB_MODES }
+    //   { type: 'wbOnePushTrigger' }
+    async exposure(id, action) {
+        const entry = this.#entry(id);
+        if (!entry) return { ok: false, message: 'Unknown camera.' };
+        let payload;
+        try {
+            switch (action?.type) {
+                case 'aeMode': payload = V.aeMode(ADDRESS, action.value); break;
+                case 'expCompOn': payload = V.expCompOn(ADDRESS, Boolean(action.value)); break;
+                case 'step': payload = V.step(ADDRESS, action.setting, action.dir); break;
+                case 'backlight': payload = V.backlight(ADDRESS, Boolean(action.value)); break;
+                case 'wbMode': payload = V.wbMode(ADDRESS, action.value); break;
+                case 'wbOnePushTrigger': payload = V.wbOnePushTrigger(ADDRESS); break;
+                default: return { ok: false, message: 'Unknown exposure setting.' };
+            }
+        } catch (err) {
+            return { ok: false, message: err.message };
+        }
+        return this.#send(entry, payload);
+    }
+
+    // Reads the camera's current exposure and white balance. Anything the
+    // camera does not answer comes back as null.
+    async readExposure(id) {
+        const entry = this.#entry(id);
+        if (!entry?.client) return { ok: false, message: entry ? notReady(entry) : 'Unknown camera.' };
+        const ask = async (name) => {
+            try {
+                return await entry.client.inquiry(V.inquiry(ADDRESS, name));
+            } catch {
+                return null;
+            }
+        };
+        const byte = (data) => (data && data.length ? data[0] : null);
+        const level = (data) => (data && data.length >= 4 ? V.decodeNibbles(data, 2, 2) : null);
+        const onOff = (data) => (byte(data) === 0x02 ? true : byte(data) === 0x03 ? false : null);
+        const nameOf = (table, value) => Object.keys(table).find((k) => table[k] === value) ?? null;
+
+        const values = {
+            aeMode: nameOf(V.AE_MODES, byte(await ask('aeMode'))),
+            expCompOn: onOff(await ask('expCompOn')),
+            expComp: level(await ask('expComp')),
+            backlight: onOff(await ask('backlight')),
+            wbMode: nameOf(V.WB_MODES, byte(await ask('wbMode'))),
+            iris: level(await ask('iris')),
+            shutter: level(await ask('shutter')),
+            bright: level(await ask('bright')),
+        };
+        return { ok: true, values };
     }
 
     async dispose() {

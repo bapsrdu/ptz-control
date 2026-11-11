@@ -136,6 +136,53 @@ export function powerStandby(address) {
     return msg(address, 0x01, 0x04, 0x00, 0x03);
 }
 
+// --- Exposure and white balance ----------------------------------------------
+// From the manual's CAM_AE, CAM_ExpComp, CAM_Back Light, CAM_Iris,
+// CAM_Shutter, CAM_Bright and CAM_WB tables.
+
+export const AE_MODES = Object.freeze({ auto: 0x00, manual: 0x03, shutter: 0x0a, iris: 0x0b, bright: 0x0d });
+
+export function aeMode(address, mode) {
+    if (!(mode in AE_MODES)) throw new RangeError(`Unknown exposure mode ${mode}`);
+    return msg(address, 0x01, 0x04, 0x39, AE_MODES[mode]);
+}
+
+export function expCompOn(address, on) {
+    return msg(address, 0x01, 0x04, 0x3e, on ? 0x02 : 0x03);
+}
+
+// Up/down/reset for the stepped settings: exposure compensation, iris,
+// shutter and brightness.
+const STEP_CODES = Object.freeze({ expComp: 0x0e, iris: 0x0b, shutter: 0x0a, bright: 0x0d });
+const STEP_DIRS = Object.freeze({ reset: 0x00, up: 0x02, down: 0x03 });
+
+export function step(address, setting, dir) {
+    if (!(setting in STEP_CODES)) throw new RangeError(`Unknown setting ${setting}`);
+    if (!(dir in STEP_DIRS)) throw new RangeError(`Unknown direction ${dir}`);
+    return msg(address, 0x01, 0x04, STEP_CODES[setting], STEP_DIRS[dir]);
+}
+
+export function backlight(address, on) {
+    return msg(address, 0x01, 0x04, 0x33, on ? 0x02 : 0x03);
+}
+
+// White balance modes and their bytes (CAM_WB table).
+export const WB_MODES = Object.freeze({
+    auto: 0x00, '3000K': 0x01, '3500K': 0x07, '4000K': 0x02, '4500K': 0x08, '5000K': 0x04,
+    '5500K': 0x09, '6000K': 0x0a, '6500K': 0x06, '7000K': 0x0b, onePush: 0x03, manual: 0x05,
+});
+
+export function wbMode(address, mode) {
+    if (!(mode in WB_MODES)) throw new RangeError(`Unknown white balance ${mode}`);
+    return msg(address, 0x01, 0x04, 0x35, WB_MODES[mode]);
+}
+
+// Standard VISCA "one push WB trigger": measures white now (point the camera
+// at something white first). Not in the BZB manual's table: verify on site.
+export function wbOnePushTrigger(address) {
+    return msg(address, 0x01, 0x04, 0x10, 0x05);
+}
+
 // --- Inquiries --------------------------------------------------------------
 
 export function powerInquiry(address) {
@@ -148,6 +195,23 @@ export function zoomPositionInquiry(address) {
 
 export function panTiltPositionInquiry(address) {
     return msg(address, 0x09, 0x06, 0x12);
+}
+
+export const INQUIRIES = Object.freeze({
+    aeMode: [0x04, 0x39],
+    expCompOn: [0x04, 0x3e],
+    expComp: [0x04, 0x4e],
+    backlight: [0x04, 0x33],
+    wbMode: [0x04, 0x35],
+    iris: [0x04, 0x4b],
+    shutter: [0x04, 0x4a],
+    bright: [0x04, 0x4d],
+});
+
+export function inquiry(address, name) {
+    const code = INQUIRIES[name];
+    if (!code) throw new RangeError(`Unknown inquiry ${name}`);
+    return msg(address, 0x09, ...code);
 }
 
 export function isInquiry(buf) {

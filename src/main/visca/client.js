@@ -167,7 +167,9 @@ export class ViscaClient extends EventEmitter {
     #heartbeat() {
         if (this.stopped || !this.transport?.isOpen) return;
         if (this.inFlight || this.queue.length) return;
-        this.inquiry(powerInquiry(this.address)).catch(() => {});
+        this.inquiry(powerInquiry(this.address))
+            .then((data) => this.emit('power', data[0] === 0x02 ? 'on' : 'standby'))
+            .catch(() => {});
     }
 
     #pump() {

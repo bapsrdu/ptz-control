@@ -16,6 +16,12 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
     const [form, setForm] = useState(startAdding ? 'new' : null);
     const editing = settings.cameras.find((c) => c.id === form) ?? null;
 
+    async function powerAll(on) {
+        if (!on && !window.confirm('Put every camera in standby? They turn to their rest positions. Do this after the service.')) return;
+        const out = await window.ptz.powerAll(on);
+        if (!out?.ok) onError(out?.message || 'Not every camera answered.');
+    }
+
     async function remove(camera) {
         const ok = window.confirm(
             `Remove "${camera.name}"?\n\nIts shots are removed from this app. The positions stay stored in the camera.`,
@@ -95,6 +101,17 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                             <Plus size={16} /> Add a camera
                         </button>
                     </div>
+                    {settings.cameras.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-edge bg-panel px-4 py-3" data-testid="power-all">
+                            <span className="mr-auto text-sm text-zinc-300">All cameras</span>
+                            <button type="button" className="rounded-lg bg-panel-2 px-3 py-1.5 text-sm hover:bg-white/10" onClick={() => powerAll(true)}>
+                                Wake all
+                            </button>
+                            <button type="button" className="rounded-lg bg-panel-2 px-3 py-1.5 text-sm hover:bg-white/10" onClick={() => powerAll(false)}>
+                                Standby all
+                            </button>
+                        </div>
+                    )}
                     <AtemSettings atemSettings={settings.atem} atem={atem} cameras={settings.cameras} onError={onError} />
                 </>
             )}

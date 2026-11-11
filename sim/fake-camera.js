@@ -47,6 +47,14 @@ export class FakeCamera extends EventEmitter {
             presets: new Map(),
             lastPreset: null,
             tally: { red: false, green: false },
+            ae: 0x00,
+            expCompOn: false,
+            expComp: 7,
+            backlight: false,
+            wb: 0x00,
+            iris: 10,
+            shutter: 8,
+            bright: 12,
         };
         this.server = null;
         this.clients = new Set();
@@ -164,12 +172,51 @@ export class FakeCamera extends EventEmitter {
         }
         if (is(0x09, 0x04, 0x3f) && b.length === 5) return [[0x90, 0x50, s.lastPreset ?? 0, 0xff]];
         if (is(0x09, 0x04, 0x38) && b.length === 5) return [[0x90, 0x50, s.focusAuto ? 0x02 : 0x03, 0xff]];
+        if (is(0x09, 0x04, 0x39) && b.length === 5) return [[0x90, 0x50, s.ae, 0xff]];
+        if (is(0x09, 0x04, 0x3e) && b.length === 5) return [[0x90, 0x50, s.expCompOn ? 0x02 : 0x03, 0xff]];
+        if (is(0x09, 0x04, 0x33) && b.length === 5) return [[0x90, 0x50, s.backlight ? 0x02 : 0x03, 0xff]];
+        if (is(0x09, 0x04, 0x35) && b.length === 5) return [[0x90, 0x50, s.wb, 0xff]];
+        const levels = { 0x4e: 'expComp', 0x4b: 'iris', 0x4a: 'shutter', 0x4d: 'bright' };
+        if (b[1] === 0x09 && b[2] === 0x04 && levels[b[3]] && b.length === 5) {
+            const v = s[levels[b[3]]];
+            return [[0x90, 0x50, 0x00, 0x00, (v >> 4) & 0x0f, v & 0x0f, 0xff]];
+        }
+
+        // A camera in standby only answers power commands and inquiries.
+        if (!s.power && !(is(0x01, 0x04, 0x00) && b.length === 6)) return [[0x90, 0x61, 0x41, 0xff]];
 
         // Power
         if (is(0x01, 0x04, 0x00) && b.length === 6 && (b[4] === 0x02 || b[4] === 0x03)) {
             s.power = b[4] === 0x02;
             return done();
         }
+        // Exposure
+        if (is(0x01, 0x04, 0x39) && b.length === 6 && [0x00, 0x03, 0x0a, 0x0b, 0x0d].includes(b[4])) {
+            s.ae = b[4];
+            return done();
+        }
+        if (is(0x01, 0x04, 0x3e) && b.length === 6 && (b[4] === 0x02 || b[4] === 0x03)) {
+            s.expCompOn = b[4] === 0x02;
+            return done();
+        }
+        if (is(0x01, 0x04, 0x33) && b.length === 6 && (b[4] === 0x02 || b[4] === 0x03)) {
+            s.backlight = b[4] === 0x02;
+            return done();
+        }
+        const steps = { 0x0e: ['expComp', 7, 14], 0x0b: ['iris', 10, 17], 0x0a: ['shutter', 8, 21], 0x0d: ['bright', 12, 27] };
+        if (b[1] === 0x01 && b[2] === 0x04 && steps[b[3]] && b.length === 6 && [0x00, 0x02, 0x03].includes(b[4])) {
+            const [key, reset, max] = steps[b[3]];
+            if (b[4] === 0x00) s[key] = reset;
+            if (b[4] === 0x02) s[key] = Math.min(max, s[key] + 1);
+            if (b[4] === 0x03) s[key] = Math.max(0, s[key] - 1);
+            return done();
+        }
+        if (is(0x01, 0x04, 0x35) && b.length === 6 && b[4] <= 0x0b) {
+            s.wb = b[4];
+            return done();
+        }
+        if (is(0x01, 0x04, 0x10, 0x05) && b.length === 6) return done();
+
         // Pan/tilt drive
         if (is(0x01, 0x06, 0x01) && b.length === 9) {
             const [, , , , panSpeed, tiltSpeed, panDir, tiltDir] = b;

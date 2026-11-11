@@ -70,3 +70,27 @@ test('reply parsing', () => {
     assert.equal(V.parseReply(Buffer.from([0x90, 0x41])).type, 'invalid');
     assert.equal(V.decodeNibbles([0x01, 0x02, 0x03, 0x04]), 0x1234);
 });
+
+test('exposure, white balance and their inquiries match the manual', () => {
+    assert.equal(hex(V.aeMode(1, 'auto')), '81 01 04 39 00 FF');
+    assert.equal(hex(V.aeMode(1, 'manual')), '81 01 04 39 03 FF');
+    assert.equal(hex(V.aeMode(1, 'shutter')), '81 01 04 39 0A FF');
+    assert.equal(hex(V.aeMode(1, 'iris')), '81 01 04 39 0B FF');
+    assert.equal(hex(V.aeMode(1, 'bright')), '81 01 04 39 0D FF');
+    assert.equal(hex(V.expCompOn(1, true)), '81 01 04 3E 02 FF');
+    assert.equal(hex(V.step(1, 'expComp', 'up')), '81 01 04 0E 02 FF');
+    assert.equal(hex(V.step(1, 'expComp', 'reset')), '81 01 04 0E 00 FF');
+    assert.equal(hex(V.step(1, 'iris', 'down')), '81 01 04 0B 03 FF');
+    assert.equal(hex(V.step(1, 'shutter', 'up')), '81 01 04 0A 02 FF');
+    assert.equal(hex(V.step(1, 'bright', 'down')), '81 01 04 0D 03 FF');
+    assert.equal(hex(V.backlight(1, false)), '81 01 04 33 03 FF');
+    assert.equal(hex(V.wbMode(1, 'auto')), '81 01 04 35 00 FF');
+    assert.equal(hex(V.wbMode(1, '5500K')), '81 01 04 35 09 FF');
+    assert.equal(hex(V.wbMode(1, '7000K')), '81 01 04 35 0B FF');
+    assert.equal(hex(V.wbMode(1, 'onePush')), '81 01 04 35 03 FF');
+    assert.equal(hex(V.inquiry(1, 'aeMode')), '81 09 04 39 FF');
+    assert.equal(hex(V.inquiry(1, 'expComp')), '81 09 04 4E FF');
+    assert.equal(hex(V.inquiry(1, 'wbMode')), '81 09 04 35 FF');
+    assert.throws(() => V.aeMode(1, 'night'));
+    assert.throws(() => V.step(1, 'gain', 'up'));
+});

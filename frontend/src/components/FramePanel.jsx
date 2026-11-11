@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Home, PersonStanding, Rabbit, Radio, Turtle } from 'lucide-react';
+import { Home, Moon, PersonStanding, Power, Rabbit, Radio, SunMedium, Turtle } from 'lucide-react';
 import Joystick from './Joystick.jsx';
 import ZoomSlider from './ZoomSlider.jsx';
 import HoldButton from './HoldButton.jsx';
@@ -8,7 +8,7 @@ import { useDrive } from '../useDrive.js';
 const SPEED_DEFAULT = 0.5;
 
 // Step 2: everything for framing the selected camera.
-export default function FramePanel({ camera, profile, online, live = false, trackingOn, speed, onError }) {
+export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
     const [focusMode, setFocusMode] = useState({}); // cameraId -> 'auto' | 'manual'
     const [localSpeed, setLocalSpeed] = useState(speed);
     // Moving a camera that is on air needs a deliberate "allow" first. It
@@ -45,12 +45,27 @@ export default function FramePanel({ camera, profile, online, live = false, trac
         if (out?.ok) setFocusMode((m) => ({ ...m, [camera.id]: next }));
     }
 
-    const disabled = !online || locked;
+    const standby = power === 'standby';
+    const disabled = !online || locked || standby;
+
+    async function setPower(on) {
+        if (!on && !window.confirm(`Put ${camera.name} in standby?${live ? `\n\n${camera.name} is live: it will turn away from the shot.` : '\n\nIt will turn to its rest position.'}`)) return;
+        await run(window.ptz.power(camera.id, on));
+    }
     const pill = (active) => `rounded-lg px-3 py-1.5 text-sm font-medium transition ${active ? 'bg-accent text-zinc-900' : 'bg-panel-2 text-zinc-300 hover:bg-white/10'}`;
 
     return (
         <div className="flex flex-col gap-4">
-            {live && (
+            {standby && (
+                <div data-testid="standby-banner" className="flex items-center gap-3 rounded-xl border border-edge bg-panel-2 px-4 py-2 text-sm">
+                    <Moon size={18} className="shrink-0 text-zinc-400" />
+                    <span><b>{camera.name} is in standby.</b> Wake it up to use it.</span>
+                    <button type="button" onClick={() => setPower(true)} className="ml-auto shrink-0 rounded-lg bg-accent px-3 py-1 font-semibold text-zinc-900 hover:bg-sky-200">
+                        Wake up
+                    </button>
+                </div>
+            )}
+            {live && !standby && (
                 <div data-testid="live-guard" className={`flex items-center gap-3 rounded-xl border px-4 py-2 text-sm ${locked ? 'border-live/60 bg-live/15 text-red-100' : 'border-live/40 text-red-200'}`}>
                     <Radio size={18} className="shrink-0 text-live" />
                     {locked ? (
@@ -96,6 +111,16 @@ export default function FramePanel({ camera, profile, online, live = false, trac
                             </button>
                         </div>
                     )}
+
+                    <div className="flex items-center gap-2">
+                        <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Picture</span>
+                        <button type="button" disabled={!online || standby} aria-pressed={exposureOpen} className={`${pill(exposureOpen)} flex items-center gap-1.5`} onClick={onToggleExposure}>
+                            <SunMedium size={16} /> Exposure
+                        </button>
+                        <button type="button" disabled={!online || standby} title={`Put ${camera.name} in standby`} className={`${pill(false)} flex items-center gap-1.5`} onClick={() => setPower(false)}>
+                            <Power size={16} /> Standby
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-2">
                         <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Position</span>

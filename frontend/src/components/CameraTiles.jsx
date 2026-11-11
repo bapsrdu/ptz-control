@@ -35,7 +35,7 @@ export default function CameraTiles({ cameras, statuses, video, tracking, select
                         <div className="flex items-center gap-2 px-2.5 py-2">
                             <span className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} />
                             <span className="truncate text-sm font-semibold">{camera.name}</span>
-                            <span className="ml-auto shrink-0 text-[11px] text-zinc-400">{status.label}</span>
+                            <span className="ml-auto shrink-0 text-[11px] text-zinc-400">{status.state === 'online' && status.power === 'standby' ? 'Standby' : status.label}</span>
                         </div>
                     </button>
                 );

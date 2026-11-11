@@ -98,6 +98,24 @@ On the controls:
 - [ ] Check with the director: the app never changed what was on air.
 - [ ] Untick "tally lights follow the ATEM". The tally lights go off.
 
+## Check 4: after phase 5
+
+- [ ] Turn tracking on for a camera, then move it with the joystick. Tracking
+      turns off by itself and a blue message says so. The camera does not
+      fight the joystick.
+- [ ] Exposure panel: each mode (Auto, Manual, Shutter, Iris, Bright) changes
+      the picture, and the panel shows the mode the camera is really in.
+- [ ] Brighter/darker: turn it on, press + a few times. The picture gets
+      brighter. Note how many steps there are: ____
+- [ ] Backlight on with a bright window behind someone. The person gets
+      brighter.
+- [ ] White balance: try 3000K and 5500K; the colours change. Choose One
+      push, fill the shot with a white card, press "Set white now". Does it
+      work? ____
+- [ ] Standby: the camera turns to its rest position and the tile says
+      Standby. Wake up brings it back, and its shots still work.
+- [ ] Standby all / Wake all from Settings.
+
 ### For phase 6
 
 - [ ] Open one camera's web page in Chrome. Open DevTools (F12) on the Network

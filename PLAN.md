@@ -329,12 +329,22 @@ control once including Track Configuration, and export the log into `docs/`.
   on or off is the only ATEM write.
 - `sim/fake-atem.js` stands in for the switcher in tests (`PTZ_FAKE_ATEM=1`).
 
-### Phase 5: tracking toggle and exposure
+### Phase 5: tracking hand-off, exposure and power (built)
 
-- Tracking on/off per camera. Turn tracking off automatically when the
-  operator touches the joystick or recalls a preset on that camera, and show
-  that it happened.
-- Exposure panel and camera power.
+- Moving, zooming, sending Home or recalling a shot on a camera that is auto
+  tracking turns tracking off first (the tracking-off command is queued ahead
+  of the move), and a blue message says so.
+- Exposure panel (opens in place of the shots panel, beside the joystick):
+  mode (Auto, Manual, Shutter priority, Iris priority, Bright), brighter/darker
+  (exposure compensation) in the auto modes, iris, shutter and brightness
+  steps in the modes that use them, backlight, and white balance (auto, fixed
+  3000K to 7000K, one push with "Set white now", manual). It reads the
+  camera's real settings when opened and after every change.
+- Power: Standby button per camera (asks first; warns if live), a standby
+  banner with Wake up, "Standby" on the tile, and Wake all / Standby all in
+  Settings. The 5-second heartbeat keeps the power state current.
+- The one-push white balance trigger (`8x 01 04 10 05 FF`) is standard VISCA
+  but not in the BZB manual: verify on site.
 
 ### Phase 6: web-page-only features
 
