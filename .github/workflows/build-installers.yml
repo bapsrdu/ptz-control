@@ -3,8 +3,14 @@ name: Build installers
 # Builds the Windows installer and the Mac disk images on GitHub's own Windows
 # and Mac machines, so nobody needs a Mac or a Windows build PC.
 #
-# Run it from the Actions tab (Build installers, Run workflow), or push a
-# version tag such as v0.9.0 to also attach the installers to a GitHub Release.
+# Ways to start it:
+#   - Publish a Release on GitHub (Releases, Draft a new release, new tag such
+#     as v0.9.0, Publish). The installers are attached to that Release.
+#   - Push a version tag such as v0.9.0 (same result).
+#   - Push a commit whose message contains [build installers] to any branch.
+#     The installers appear under Artifacts on that Actions run.
+#   - Actions tab, Build installers, Run workflow (once this file is on the
+#     default branch).
 #
 # The installers are not code-signed (that needs paid Apple and Windows
 # certificates). Windows shows a SmartScreen warning on first run (More info,
@@ -12,15 +18,22 @@ name: Build installers
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   push:
     tags:
       - "v*"
+    branches:
+      - "**"
 
 permissions:
   contents: write # only used by the Release step on tag pushes
 
 jobs:
   build:
+    # Branch pushes only build when asked to, so everyday commits do not use
+    # up Mac build minutes.
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[build installers]')
     strategy:
       fail-fast: false
       matrix:
@@ -64,7 +77,7 @@ jobs:
           path: ${{ matrix.files }}
 
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.files }}

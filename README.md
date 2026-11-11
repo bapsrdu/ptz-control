@@ -67,11 +67,15 @@ way.
 ## Building the installers
 
 Installers are built on GitHub's own Windows and Mac machines by
-`.github/workflows/build-installers.yml`. In the repository's **Actions** tab,
-choose **Build installers**, then **Run workflow**. When it finishes, the
-Windows installer and the two Mac disk images are under **Artifacts** on that
-run. Pushing a version tag such as `v0.9.0` builds them too and attaches them
-to a GitHub Release.
+`.github/workflows/build-installers.yml`. The easiest way to make a release:
+on GitHub, open **Releases**, choose **Draft a new release**, type a new tag
+such as `v0.9.0`, pick the branch, and **Publish**. About ten minutes later the
+Windows installer and both Mac disk images are attached to that release.
+
+Other ways to start a build: push a tag like `v0.9.0`, push a commit whose
+message contains `[build installers]` (the files appear under **Artifacts** on
+that Actions run), or use **Actions, Build installers, Run workflow** once the
+workflow is on the main branch.
 
 To build on your own computer instead:
 
