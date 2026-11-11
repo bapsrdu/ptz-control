@@ -47,6 +47,17 @@ npm start
 
 Settings are saved in Electron's user data folder as `settings.json`.
 
+If `npm start` says Electron failed to install, your npm is blocking
+Electron's download step. Run these once, then `npm start` again:
+
+```bash
+npm install-scripts approve electron
+```
+
+```bash
+npm rebuild electron
+```
+
 ## Trying it without cameras
 
 Start some pretend cameras in a second terminal:
