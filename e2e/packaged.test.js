@@ -60,5 +60,6 @@ test('packaged app: cameras, video, movement and ATEM all work', { skip: !execut
     const start = Date.now();
     while (!cam.received.includes('81 01 06 01 01 01 03 03 FF') && Date.now() - start < 3000) await new Promise((r) => setTimeout(r, 50));
     assert.ok(cam.received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('03 01 FF')), cam.received.join(' | '));
-    assert.equal(cam.received.at(-1), '81 01 06 01 01 01 03 03 FF');
+    const lastDrive = cam.received.findLastIndex((h) => h.startsWith('81 01 06 01') && !h.endsWith('03 03 FF'));
+    assert.ok(cam.received.lastIndexOf('81 01 06 01 01 01 03 03 FF') > lastDrive, 'Stop must come after the last move');
 });

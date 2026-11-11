@@ -115,7 +115,10 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     const drives = fake.received.filter((h) => h.startsWith('81 01 06 01') && h.endsWith('02 03 FF'));
     assert.ok(drives.length >= 1, `expected a pan-right drive, got ${fake.received.join(' | ')}`);
     assert.ok(drives.length <= 8, `too many drive messages: ${drives.length}`);
-    assert.equal(fake.received.at(-1), '81 01 06 01 01 01 03 03 FF', 'last message must be Stop');
+    // What matters: a Stop comes after the last movement. (Other stops, such
+    // as zoom, may follow; the app stops everything when focus moves.)
+    const lastDrive = fake.received.findLastIndex((h) => h.startsWith('81 01 06 01') && !h.endsWith('03 03 FF'));
+    assert.ok(fake.received.lastIndexOf('81 01 06 01 01 01 03 03 FF') > lastDrive, 'Stop must come after the last move');
 
     // Zoom lever: push up, let go.
     fake.clearLog();
