@@ -233,19 +233,20 @@ tests/                   node --test suite
 
 ## 7. Phases
 
-### Phase 1: skeleton, settings and simulators
+### Phase 1: skeleton, settings and simulators (built)
 
 - Project setup as in section 6, with lint and tests running in CI.
 - Camera list in settings: add, edit, remove, reorder.
 - `sim/fake-camera`: answers VISCA on a chosen port, keeps pan, tilt, zoom and
   presets in memory, logs each command. It can be started in each of the four
   transport modes.
-- `sim/fake-atem`, or a mock behind the ATEM service's interface.
+- `sim/fake-atem` moved to phase 4, where the ATEM service it stands in for
+  is written.
 
 Done when: the app opens with no cameras, a camera can be added, and the
 screen shows the right number of tiles for one, three and six cameras.
 
-### Phase 2: camera connection, movement and presets
+### Phase 2: camera connection, movement and presets (built)
 
 - VISCA client with one command queue per camera, reply handling, timeouts
   and reconnect.
@@ -259,6 +260,19 @@ screen shows the right number of tiles for one, three and six cameras.
 
 Done when: every control produces the expected bytes in the fake camera's
 log, in all four transport modes, checked by tests.
+
+Notes from building it:
+
+- A camera saved without a successful Test is looked for in the background
+  every 10 seconds, and the transport is saved when it answers.
+- Each held control re-sends its position every 400 ms, and the main process
+  stops the camera if it hears nothing for 1.5 seconds. This covers a frozen
+  window as well as blur and quit.
+- Replies are matched using the VISCA socket number, so a late "done" reply
+  for one command is not mistaken for the answer to the next.
+- The large preview area shows the selected camera's name and status until
+  phase 3 adds video.
+- `e2e/` drives the real window against fake cameras and runs in CI.
 
 ### On-site check 1 (needs a person at the temple)
 

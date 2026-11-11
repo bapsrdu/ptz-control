@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+    --color-panel: #171a21;
+    --color-panel-2: #1f232c;
+    --color-edge: #2c313c;
+    --color-live: #ef4444;
+    --color-next: #4ade80;
+    --color-accent: #7dd3fc;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background: #0f1115;
+    color: #e5e7eb;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+input,
+select {
+    user-select: text;
+}
+
+/* Joystick and sliders must not scroll or select while dragged. */
+.touch-none {
+    touch-action: none;
+}

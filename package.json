@@ -1,0 +1,40 @@
+{
+  "name": "ptz-control",
+  "productName": "PTZ Control",
+  "version": "0.1.0",
+  "description": "Simple PTZ camera control for temple AV volunteers",
+  "main": "main.js",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:renderer": "vite build",
+    "prestart": "npm run build:renderer",
+    "start": "electron .",
+    "dev:renderer": "vite",
+    "sim": "node sim/fake-camera.js",
+    "test": "node --test --test-timeout=20000 tests/*.test.js",
+    "test:e2e": "npm run build:renderer && node --test --test-timeout=60000 e2e/*.test.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "lucide-react": "^1.72.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^41.10.7",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.14.0",
+    "playwright-core": "^1.56.1",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8"
+  }
+}
