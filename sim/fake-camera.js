@@ -2,10 +2,12 @@
 // A pretend PTZ camera that answers VISCA over IP. Used by the tests, and by
 // people who want to try the app without real cameras.
 //
-//   npm run sim -- --mode udp-sony --port 1259 --count 3
+//   npm run sim -- --mode udp-raw --port 1259 --count 3 --video
 //
 // starts three fake cameras on ports 1259, 1260 and 1261 and prints every
 // command they receive. Add them in the app as 127.0.0.1 with those ports.
+// With --video each also streams a test picture; the video addresses are
+// printed (rtsp://127.0.0.1:8554/live/av1 and up).
 
 import dgram from 'node:dgram';
 import net from 'node:net';
@@ -14,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { createDecoder, encodeSony, PAYLOAD } from '../src/main/visca/framing.js';
 import { parseMode, MODES } from '../src/main/visca/transport.js';
 import { toHex } from '../src/main/visca/commands.js';
+import { FakeRtspServer } from './fake-rtsp.js';
 
 const ACK = [0x90, 0x41, 0xff];
 const COMPLETION = [0x90, 0x51, 0xff];
@@ -254,11 +257,13 @@ function nibbles(value) {
 }
 
 function parseArgs(argv) {
-    const args = { mode: 'udp-sony', port: 1259, count: 1, host: '0.0.0.0' };
+    const args = { mode: 'udp-raw', port: 1259, count: 1, host: '0.0.0.0', video: false, videoPort: 8554 };
     for (let i = 0; i < argv.length; i += 1) {
         const key = argv[i].replace(/^--/, '');
         const value = argv[i + 1];
         if (key === 'help' || key === 'h') return { help: true };
+        if (key === 'video') { args.video = true; continue; }
+        if (key === 'video-port') { args.videoPort = Number(value); i += 1; continue; }
         if (['mode', 'host'].includes(key)) { args[key] = value; i += 1; }
         else if (['port', 'count'].includes(key)) { args[key] = Number(value); i += 1; }
     }
@@ -268,7 +273,7 @@ function parseArgs(argv) {
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     if (args.help || !MODES.includes(args.mode)) {
-        console.log(`Usage: npm run sim -- [--mode ${MODES.join('|')}] [--port 1259] [--count 1] [--host 0.0.0.0]`);
+        console.log(`Usage: npm run sim -- [--mode ${MODES.join('|')}] [--port 1259] [--count 1] [--host 0.0.0.0] [--video] [--video-port 8554]`);
         process.exit(args.help ? 0 : 1);
     }
     process.env.FAKE_CAMERA_VERBOSE = '1';
@@ -278,6 +283,11 @@ async function main() {
         await cam.start();
         cameras.push(cam);
         console.log(`Fake camera ${i + 1}: ${args.mode} on ${args.host}:${cam.port}`);
+        if (args.video) {
+            const rtsp = await new FakeRtspServer({ host: args.host, port: args.videoPort + i }).start();
+            cameras.push(rtsp);
+            console.log(`  video address: rtsp://127.0.0.1:${rtsp.port}/live/av1`);
+        }
     }
     console.log('Press Ctrl+C to stop.');
     process.on('SIGINT', async () => {

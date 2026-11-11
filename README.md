@@ -8,9 +8,9 @@ speaks standard VISCA over IP.
 Works on Windows and Mac. Cameras are added in the app, so the same install
 works at any temple with any number of cameras.
 
-The full plan is in [PLAN.md](PLAN.md). Phases 1 and 2 are built: adding
-cameras, moving them, and saved shots. Video preview and the ATEM link come
-next.
+The full plan is in [PLAN.md](PLAN.md). Phases 1 to 3 are built: adding
+cameras, moving them, saved shots, and live video from each camera. The ATEM
+link comes next.
 
 ## Using it
 
@@ -27,7 +27,14 @@ next.
      stops when you let go.
    - use the speed slider (turtle to rabbit) to set the top speed.
    - press **+** in the Shots panel to save where a camera is pointing, and
-     click a shot to send the camera back there.
+     click a shot to send the camera back there. The shot button shows a
+     small picture of what the camera saw.
+
+Video: each camera's tile and the large view show its live video. For BZB
+cameras this is the camera's sub stream, `rtsp://<IP>:554/live/av1`, found
+automatically. For other cameras, or if the camera asks for a login, enter the
+video address in the camera's settings, for example
+`rtsp://admin:password@192.168.1.50:554/live/av1`. The stream must be H.264.
 
 Safety: every camera is told to stop whenever the app window loses focus, the
 window stops responding, or the app closes. A held control also has to keep
@@ -63,12 +70,14 @@ npm rebuild electron
 Start some pretend cameras in a second terminal:
 
 ```bash
-npm run sim -- --mode udp-sony --port 1259 --count 3
+npm run sim -- --port 1259 --count 3 --video
 ```
 
-Then add them in the app as `127.0.0.1`, ports 1259, 1260 and 1261. Every
-command they receive is printed in the terminal. `--mode` can be `udp-sony`,
-`udp-raw`, `tcp-raw` or `tcp-sony`.
+Then add them in the app as `127.0.0.1`, ports 1259, 1260 and 1261, with the
+video addresses the terminal prints (`rtsp://127.0.0.1:8554/live/av1` and up).
+Every command they receive is printed in the terminal. Add `--mode` to pick
+how they talk: `udp-raw` (like the BZB cameras, the default), `udp-sony`,
+`tcp-raw` or `tcp-sony`.
 
 ## Tests
 
@@ -95,9 +104,11 @@ preload.cjs              The only bridge between the window and main.js
 src/main/visca/          VISCA commands, framing, transports, client, auto-detect
 src/main/profiles/       Camera models (BZB ADAMO, generic VISCA)
 src/main/cameras/        One connection per camera; joystick rate limit and watchdog
-src/main/store/          Settings file and the rules for cameras and shots
+src/main/video/          RTSP client and H.264 unpacking for the video
+src/main/store/          Settings file, the rules for cameras and shots, shot pictures
 frontend/src/            The window (React)
 sim/fake-camera.js       Pretend camera for tests and trying the app
+sim/fake-rtsp.js         Pretend camera video stream (loops sim/assets/test-pattern.h264)
 tests/                   Unit and network tests (node --test)
 e2e/                     Tests that drive the real app window
 docs/                    On-site checklist

@@ -18,6 +18,13 @@ contextBridge.exposeInMainWorld('ptz', {
         return () => ipcRenderer.removeListener('notice', listener);
     },
 
+    // Video frames: callback(cameraId, { codec, key, data })
+    onVideoFrame: (callback) => {
+        const listener = (_event, cameraId, frame) => callback(cameraId, frame);
+        ipcRenderer.on('video:frame', listener);
+        return () => ipcRenderer.removeListener('video:frame', listener);
+    },
+
     // Camera list
     addCamera: invoke('camera:add'),
     updateCamera: invoke('camera:update'),

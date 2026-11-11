@@ -10,7 +10,7 @@ const MODE_LABELS = {
 };
 
 export default function SettingsView({ state, startAdding, onBack, onError }) {
-    const { settings, statuses, profiles } = state;
+    const { settings, statuses, profiles, video } = state;
     // null = list, 'new' = adding, otherwise the id of the camera being edited
     const [form, setForm] = useState(startAdding ? 'new' : null);
     const editing = settings.cameras.find((c) => c.id === form) ?? null;
@@ -69,6 +69,9 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                                                 ? `Connected using ${MODE_LABELS[camera.mode] ?? camera.mode}`
                                                 : status.message || status.label}
                                         </div>
+                                        <div className="mt-0.5 text-xs text-zinc-500" data-testid="video-status">
+                                            Video: {videoText(video?.[camera.id])}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <IconButton label="Move up" disabled={i === 0} onClick={() => window.ptz.moveCamera(camera.id, -1)}><ArrowUp size={16} /></IconButton>
@@ -95,6 +98,12 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
     );
 }
 
+function videoText(status) {
+    if (!status || status.state === 'connecting') return 'starting';
+    if (status.state === 'playing') return 'playing';
+    return status.message || 'not available';
+}
+
 function IconButton({ label, danger, children, ...rest }) {
     return (
         <button
@@ -115,6 +124,7 @@ function CameraForm({ camera, cameras, profiles, onDone }) {
         profile: camera?.profile ?? profiles[0]?.id,
         host: camera?.host ?? '',
         port: camera ? String(camera.port) : '',
+        previewUrl: camera?.previewUrl ?? '',
     }));
     const [errors, setErrors] = useState({});
     const [test, setTest] = useState(null); // { running } | detect result + the host/port it was for
@@ -171,6 +181,16 @@ function CameraForm({ camera, cameras, profiles, onDone }) {
                     <input className={input} value={fields.port} onChange={set('port')} name="port" placeholder={String(profile?.defaultPort ?? '')} inputMode="numeric" />
                 </Field>
             </div>
+
+            <Field
+                label="Video address (optional)"
+                hint={profile?.videoUrlTemplate
+                    ? `Leave empty to use ${profile.videoUrlTemplate.replace('{host}', fields.host.trim() || 'the IP address')}. If the camera asks for a login, use rtsp://username:password@... here.`
+                    : 'This camera model has no usual video address. Enter its RTSP address to see video.'}
+                error={errors.previewUrl}
+            >
+                <input className={input} value={fields.previewUrl} onChange={set('previewUrl')} name="previewUrl" placeholder={profile?.videoUrlTemplate?.replace('{host}', fields.host.trim() || '192.168.1.50') ?? 'rtsp://...'} spellCheck={false} />
+            </Field>
 
             <div className="flex flex-col gap-2 rounded-lg bg-black/30 p-3">
                 <div className="flex items-center gap-3">

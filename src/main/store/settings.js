@@ -78,10 +78,18 @@ export function validateCameraInput(input = {}, { cameras = [], editingId = null
 
     const mode = MODES.includes(input.mode) ? input.mode : null;
 
+    // Optional. Empty means "use the camera model's usual video address".
+    const previewUrl = String(input.previewUrl ?? '').trim();
+    if (previewUrl) {
+        let ok = /^rtsp:\/\/\S+$/i.test(previewUrl) && previewUrl.length <= 500;
+        try { if (ok) ok = Boolean(new URL(previewUrl).hostname); } catch { ok = false; }
+        if (!ok) errors.previewUrl = 'The video address must start with rtsp://, for example rtsp://192.168.1.50:554/live/av1.';
+    }
+
     return {
         ok: Object.keys(errors).length === 0,
         errors,
-        value: { name, host, port, profile: profileId, mode },
+        value: { name, host, port, profile: profileId, mode, previewUrl },
     };
 }
 
@@ -94,6 +102,7 @@ function normalizePreset(raw, used) {
         id: typeof raw.id === 'string' && raw.id ? raw.id : newId(),
         name: cleanText(raw.name, PRESET_NAME_MAX) || `Shot ${number}`,
         number,
+        thumb: raw.thumb === true,
     };
 }
 
@@ -215,13 +224,13 @@ function withCamera(settings, cameraId, fn) {
     );
 }
 
-export function addPreset(settings, cameraId, { name, number }) {
+export function addPreset(settings, cameraId, { name, number, thumb = false }) {
     return withCamera(settings, cameraId, (camera) => {
         if (camera.presets.some((p) => p.number === number)) return failure({ form: 'That preset number is taken.' });
         if (!Number.isInteger(number) || number < SHOT_PRESET_FIRST || number > SHOT_PRESET_LAST) {
             return failure({ form: 'No free preset numbers left on this camera.' });
         }
-        const preset = { id: newId(), name: cleanText(name, PRESET_NAME_MAX) || `Shot ${number}`, number };
+        const preset = { id: newId(), name: cleanText(name, PRESET_NAME_MAX) || `Shot ${number}`, number, thumb: Boolean(thumb) };
         return { ok: true, camera: { ...camera, presets: [...camera.presets, preset] }, extra: { preset } };
     });
 }
@@ -234,6 +243,16 @@ export function renamePreset(settings, cameraId, presetId, name) {
         return {
             ok: true,
             camera: { ...camera, presets: camera.presets.map((p) => (p.id === presetId ? { ...p, name: clean } : p)) },
+        };
+    });
+}
+
+export function setPresetThumb(settings, cameraId, presetId, thumb) {
+    return withCamera(settings, cameraId, (camera) => {
+        if (!camera.presets.some((p) => p.id === presetId)) return failure({ form: 'This shot no longer exists.' });
+        return {
+            ok: true,
+            camera: { ...camera, presets: camera.presets.map((p) => (p.id === presetId ? { ...p, thumb: Boolean(thumb) } : p)) },
         };
     });
 }

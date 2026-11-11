@@ -1,9 +1,10 @@
-import { PersonStanding, Video } from 'lucide-react';
+import { PersonStanding } from 'lucide-react';
+import VideoView from './VideoView.jsx';
 import { statusOf } from './status.js';
 
 // Step 1: one tile per camera. Clicking a tile picks the camera the controls
 // below will move. It does not change what is on air.
-export default function CameraTiles({ cameras, statuses, tracking, selectedId, onSelect }) {
+export default function CameraTiles({ cameras, statuses, video, tracking, selectedId, onSelect }) {
     return (
         <div className="flex flex-wrap gap-3" data-testid="camera-tiles">
             {cameras.map((camera, index) => {
@@ -19,7 +20,7 @@ export default function CameraTiles({ cameras, statuses, tracking, selectedId, o
                         className={`group w-40 overflow-hidden rounded-xl border-2 bg-panel-2 text-left ${selected ? 'border-next' : 'border-transparent hover:border-edge'}`}
                     >
                         <div className="relative flex aspect-video items-center justify-center bg-black/40">
-                            <Video size={28} className="text-white/15" />
+                            <VideoView cameraId={camera.id} status={video?.[camera.id]} />
                             <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 text-xs text-zinc-300">{index + 1}</span>
                             {tracking?.[camera.id] && (
                                 <span title="Auto tracking on" className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-accent">

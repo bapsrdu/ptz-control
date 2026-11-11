@@ -5,6 +5,7 @@ import FramePanel from './components/FramePanel.jsx';
 import ShotsPanel from './components/ShotsPanel.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { statusOf } from './components/status.js';
+import VideoView from './components/VideoView.jsx';
 
 export default function App() {
     const [state, setState] = useState(null);
@@ -113,7 +114,7 @@ function Step({ number, title, children }) {
 }
 
 function ControlView({ state, onError }) {
-    const { settings, statuses, tracking, profiles } = state;
+    const { settings, statuses, tracking, profiles, video } = state;
     const cameras = settings.cameras;
     const selected = cameras.find((c) => c.id === settings.ui.selectedCameraId) ?? cameras[0];
     const status = statusOf(statuses, selected.id);
@@ -126,14 +127,12 @@ function ControlView({ state, onError }) {
     return (
         <div className="flex flex-col gap-6 p-5">
             <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
-                <div className="flex aspect-video w-full items-center justify-center rounded-2xl border-2 border-next bg-black/50" data-testid="selected-view">
-                    <div className="flex flex-col items-center gap-2 text-center">
-                        <span className="text-2xl font-semibold">{selected.name}</span>
-                        <span className="flex items-center gap-2 text-sm text-zinc-400">
-                            <span className={`h-2 w-2 rounded-full ${status.dot}`} />
-                            {status.state === 'online' ? 'Connected' : status.message || status.label}
-                        </span>
-                        <span className="text-xs text-zinc-600">Video preview is added in a later version.</span>
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-next" data-testid="selected-view">
+                    <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
+                    <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm">
+                        <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+                        <span className="font-semibold">{selected.name}</span>
+                        {status.state !== 'online' && <span className="text-zinc-400">{status.message || status.label}</span>}
                     </div>
                 </div>
 
@@ -141,6 +140,7 @@ function ControlView({ state, onError }) {
                     <CameraTiles
                         cameras={cameras}
                         statuses={statuses}
+                        video={video}
                         tracking={tracking}
                         selectedId={selected.id}
                         onSelect={(id) => window.ptz.setUi({ selectedCameraId: id })}

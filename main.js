@@ -1,14 +1,16 @@
 // Electron main process: owns the settings file and every camera connection,
 // and answers the window's requests over IPC (see preload.cjs).
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as S from './src/main/store/settings.js';
 import { CameraManager } from './src/main/cameras/manager.js';
 import { detectMode } from './src/main/visca/detect.js';
-import { describeProfiles } from './src/main/profiles/index.js';
+import { describeProfiles, videoUrlFor } from './src/main/profiles/index.js';
+import { VideoService } from './src/main/video/service.js';
+import { ShotImages } from './src/main/store/shot-images.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,8 +34,13 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
 }
 
+// Shot pictures are shown as <img src="ptz-shot://shots/<id>.jpg">.
+protocol.registerSchemesAsPrivileged([{ scheme: 'ptz-shot', privileges: { standard: true, secure: true } }]);
+
 let win = null;
 const store = new S.SettingsStore(app.getPath('userData'));
+const shotImages = new ShotImages(app.getPath('userData'));
+const video = new VideoService();
 const tracking = new Map(); // cameraId -> last tracking state set from this app
 const manager = new CameraManager({
     onModeDetected: (id, mode) => store.apply(S.setCameraMode, id, mode),
@@ -44,6 +51,7 @@ function snapshot() {
         settings: store.get(),
         statuses: manager.statuses(),
         tracking: Object.fromEntries(tracking),
+        video: video.statuses(),
         profiles: describeProfiles(),
     };
 }
@@ -58,14 +66,25 @@ function pushState() {
     }, 16);
 }
 
+function syncVideo(cameras) {
+    video.sync(cameras.map((c) => ({ id: c.id, url: videoUrlFor(c) })));
+}
+
 store.on('change', (settings) => {
     manager.sync(settings.cameras);
+    syncVideo(settings.cameras);
     for (const id of tracking.keys()) {
         if (!settings.cameras.some((c) => c.id === id)) tracking.delete(id);
     }
     pushState();
 });
 manager.on('status', pushState);
+video.on('status', pushState);
+video.on('frame', (cameraId, frame) => {
+    // Nobody can see a minimised window; the decoder restarts on the next key frame.
+    if (!win || win.isDestroyed() || win.isMinimized()) return;
+    win.webContents.send('video:frame', cameraId, { codec: frame.codec, key: frame.key, data: frame.data });
+});
 manager.on('notice', (cameraId, message) => {
     if (win && !win.isDestroyed()) win.webContents.send('notice', { cameraId, message });
 });
@@ -102,7 +121,13 @@ ipcMain.handle('camera:update', (_e, id, input) => {
     return out.ok ? { ok: true, camera: out.camera } : out;
 });
 
-ipcMain.handle('camera:remove', (_e, id) => (isId(id) ? store.apply(S.removeCamera, id) : unknownCamera));
+ipcMain.handle('camera:remove', (_e, id) => {
+    const cam = camera(id);
+    if (!cam) return unknownCamera;
+    const out = store.apply(S.removeCamera, id);
+    if (out.ok) for (const p of cam.presets) shotImages.remove(p.id);
+    return out;
+});
 
 ipcMain.handle('camera:move', (_e, id, delta) => (isId(id) ? store.apply(S.moveCamera, id, Number(delta) || 0) : unknownCamera));
 
@@ -160,7 +185,7 @@ ipcMain.handle('ptz:tracking', async (_e, id, on) => {
 
 // Saves the camera's current position into the camera first, and only keeps
 // the shot in the list if the camera accepted it.
-ipcMain.handle('preset:save', async (_e, cameraId, name) => {
+ipcMain.handle('preset:save', async (_e, cameraId, name, picture) => {
     const cam = camera(cameraId);
     if (!cam) return unknownCamera;
     const number = S.nextPresetNumber(cam);
@@ -168,7 +193,12 @@ ipcMain.handle('preset:save', async (_e, cameraId, name) => {
     const sent = await manager.savePreset(cameraId, number);
     if (!sent.ok) return { ok: false, message: `The shot was not saved: ${sent.message}` };
     const out = store.apply(S.addPreset, cameraId, { name, number });
-    return out.ok ? { ok: true, preset: out.preset } : { ok: false, message: Object.values(out.errors)[0] };
+    if (!out.ok) return { ok: false, message: Object.values(out.errors)[0] };
+    // The picture is a nice-to-have: a shot without one still works.
+    if (picture && shotImages.save(out.preset.id, picture)) {
+        store.apply(S.setPresetThumb, cameraId, out.preset.id, true);
+    }
+    return { ok: true, preset: out.preset };
 });
 
 ipcMain.handle('preset:recall', (_e, cameraId, presetId) => {
@@ -189,6 +219,7 @@ ipcMain.handle('preset:delete', async (_e, cameraId, presetId) => {
     // must not stop the user removing a shot from the list.
     await manager.clearPreset(cameraId, p.number);
     const out = store.apply(S.removePreset, cameraId, presetId);
+    if (out.ok) shotImages.remove(presetId);
     return out.ok ? { ok: true } : { ok: false, message: Object.values(out.errors)[0] };
 });
 
@@ -231,8 +262,15 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+    protocol.handle('ptz-shot', (request) => {
+        const name = new URL(request.url).pathname.replace(/^\//, '').replace(/\.jpg$/, '');
+        const file = shotImages.file(name);
+        if (!file) return new Response('Not found', { status: 404 });
+        return net.fetch(pathToFileURL(file).toString());
+    });
     store.load();
     manager.sync(store.get().cameras);
+    syncVideo(store.get().cameras);
     createWindow();
 });
 
@@ -243,6 +281,7 @@ app.on('before-quit', (event) => {
     event.preventDefault();
     quitting = true;
     const timeout = new Promise((resolve) => setTimeout(resolve, 600));
+    video.stopAll();
     Promise.race([manager.stopAll(), timeout])
         .then(() => Promise.race([manager.dispose(), timeout]))
         .finally(() => app.exit(0));

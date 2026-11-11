@@ -51,6 +51,23 @@ Firmware version is on the camera web page under System, Update.
       seconds, and the other cameras keep working. Plug it back in; it
       reconnects without restarting the app.
 
+## Check 2: after phase 3 (video)
+
+- [ ] Each camera's tile and the large view show live video within a few
+      seconds of opening the app.
+- [ ] Wave at a camera. The delay before it shows in the app is about
+      ____ seconds. (Under half a second is good; over one second, tell us.)
+- [ ] If a tile says "No video", copy its message here. If it mentions H.265,
+      open the camera's web page, Configuration, Video Encode, and set the Sub
+      Stream to H.264.
+- [ ] Save a shot. Its button shows a small picture of the camera's view.
+- [ ] Unplug a camera's network cable. Its video stops with a message, the
+      other cameras keep playing, and the video comes back by itself when the
+      cable is plugged back in.
+- [ ] Leave the app running for an hour with all cameras. It stays smooth and
+      the computer does not get hot or slow. Note the app's memory and CPU in
+      Task Manager: ____ MB, ____ %.
+
 ### For phase 6
 
 - [ ] Open one camera's web page in Chrome. Open DevTools (F12) on the Network

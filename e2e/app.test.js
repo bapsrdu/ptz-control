@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 import { FakeCamera } from '../sim/fake-camera.js';
+import { FakeRtspServer } from '../sim/fake-rtsp.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const shots = process.env.PTZ_SCREENSHOTS;
@@ -34,6 +35,27 @@ async function screenshot(page, name) {
     await page.screenshot({ path: path.join(shots, `${name}.png`) });
 }
 
+// Average brightness of a canvas, 0 to 255. The test picture is colourful.
+function brightness(canvas) {
+    return canvas.evaluate((c) => {
+        if (!c.width) return 0;
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4 * 97) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+        return sum / (d.length / (4 * 97));
+    });
+}
+
+async function waitForPicture(page, locator, timeoutMs = 10000) {
+    const start = Date.now();
+    for (;;) {
+        const value = await brightness(locator);
+        if (value > 30) return value;
+        if (Date.now() - start > timeoutMs) throw new Error(`no picture on the canvas (brightness ${value})`);
+        await page.waitForTimeout(200);
+    }
+}
+
 function tempDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'ptz-e2e-'));
 }
@@ -48,10 +70,11 @@ async function waitForLog(camera, hex, timeoutMs = 3000) {
     }
 }
 
-test('first run: add a camera, move it, save and recall a shot', async (t) => {
+test('first run: add a camera, see its video, move it, save and recall a shot', async (t) => {
     const fake = await new FakeCamera({ mode: 'udp-sony' }).start();
+    const rtsp = await new FakeRtspServer().start();
     const { app, page } = await launch(tempDir());
-    t.after(async () => { await app.close(); await fake.stop(); });
+    t.after(async () => { await app.close(); await fake.stop(); await rtsp.stop(); });
 
     await page.getByText('Welcome').waitFor();
     await screenshot(page, '01-welcome');
@@ -61,17 +84,21 @@ test('first run: add a camera, move it, save and recall a shot', async (t) => {
     await form.locator('input[name=name]').fill('Left');
     await form.locator('input[name=host]').fill('127.0.0.1');
     await form.locator('input[name=port]').fill(String(fake.port));
+    await form.locator('input[name=previewUrl]').fill(rtsp.url);
     await form.getByRole('button', { name: 'Test connection' }).click();
     await assert.doesNotReject(page.getByTestId('test-result').filter({ hasText: 'Found it' }).waitFor());
     await screenshot(page, '02-add-camera-tested');
     await form.getByRole('button', { name: 'Add camera' }).click();
 
     await page.getByTestId('settings-camera').filter({ hasText: 'Connected using UDP with Sony header' }).waitFor();
+    await page.getByTestId('video-status').filter({ hasText: 'Video: playing' }).waitFor();
     await screenshot(page, '03-camera-list');
     await page.getByRole('button', { name: 'Back to controls' }).click();
 
     assert.equal(await page.getByTestId('camera-tile').count(), 1);
     await page.getByTestId('camera-tile').filter({ hasText: 'Connected' }).waitFor();
+    await waitForPicture(page, page.getByTestId('selected-view').getByTestId('video-canvas'));
+    await waitForPicture(page, page.getByTestId('camera-tile').getByTestId('video-canvas'));
 
     // Drag the joystick right, hold, let go.
     fake.clearLog();
@@ -107,6 +134,10 @@ test('first run: add a camera, move it, save and recall a shot', async (t) => {
     await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Pulpit' }).waitFor();
     await waitForLog(fake, '81 01 04 3F 01 01 FF');
+    // The shot shows a picture of what the camera saw.
+    const thumb = page.getByRole('button', { name: 'Pulpit' }).locator('img');
+    await thumb.waitFor();
+    await page.waitForFunction((img) => img.complete && img.naturalWidth === 320, await thumb.elementHandle());
     await page.getByRole('button', { name: 'Pulpit' }).click();
     await waitForLog(fake, '81 01 04 3F 02 01 FF');
     await screenshot(page, '05-control-with-shot');
@@ -127,6 +158,11 @@ test('blur stops a camera that is being moved', async (t) => {
     t.after(async () => { await app.close(); await fake.stop(); });
     await page.getByTestId('camera-tile').filter({ hasText: 'Connected' }).waitFor();
 
+    // No video server for this camera: the reason is shown, and the camera
+    // can still be moved.
+    await page.getByTestId('selected-view').getByText(/refused the video connection|No answer from/).waitFor({ timeout: 10000 });
+    await screenshot(page, '07-no-video');
+
     const pad = await page.getByTestId('joystick').boundingBox();
     await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
     await page.mouse.down();
@@ -141,6 +177,7 @@ test('blur stops a camera that is being moved', async (t) => {
 for (const count of [1, 3, 6]) {
     test(`shows ${count} camera tile${count === 1 ? '' : 's'} for ${count} camera${count === 1 ? '' : 's'}`, async (t) => {
         const fakes = await Promise.all(Array.from({ length: count }, () => new FakeCamera({ mode: 'udp-raw' }).start()));
+        const streams = await Promise.all(Array.from({ length: count }, () => new FakeRtspServer().start()));
         const dir = tempDir();
         const names = ['Left', 'Centre', 'Right', 'Mandir', 'Balcony', 'Stage'];
         fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({
@@ -149,17 +186,25 @@ for (const count of [1, 3, 6]) {
                 host: '127.0.0.1',
                 port: f.port,
                 mode: 'udp-raw',
+                previewUrl: streams[i].url,
                 presets: i === 0 ? [{ name: 'Home', number: 1 }, { name: 'Pulpit', number: 2 }] : [{ name: 'Home', number: 1 }],
             })),
         }));
         const { app, page } = await launch(dir);
-        t.after(async () => { await app.close(); await Promise.all(fakes.map((f) => f.stop())); });
+        t.after(async () => {
+            await app.close();
+            await Promise.all([...fakes, ...streams].map((f) => f.stop()));
+        });
 
         await page.getByTestId('camera-tile').first().waitFor();
         assert.equal(await page.getByTestId('camera-tile').count(), count);
         assert.equal(await page.getByTestId('shots-row').count(), count);
         await page.waitForFunction((n) => document.querySelectorAll('[data-testid=camera-tile]').length === n
             && [...document.querySelectorAll('[data-testid=camera-tile]')].every((t) => t.textContent.includes('Connected')), count);
+
+        // Every tile shows its camera's video.
+        const canvases = page.getByTestId('camera-tiles').getByTestId('video-canvas');
+        for (let i = 0; i < count; i += 1) await waitForPicture(page, canvases.nth(i));
 
         // Picking another camera moves the green border.
         if (count > 1) {

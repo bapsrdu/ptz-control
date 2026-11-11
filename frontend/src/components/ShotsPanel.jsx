@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { snapshot } from '../videoHub.js';
 
 // Saved shots: one row per camera. Click a shot to send that camera to it.
 // "+" saves where the camera is pointing now.
@@ -22,7 +23,9 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) 
     }
 
     async function save(cameraId) {
-        const out = await act(window.ptz.savePreset(cameraId, text));
+        // Take the picture now, before the camera can move.
+        const picture = snapshot(cameraId);
+        const out = await act(window.ptz.savePreset(cameraId, text, picture));
         if (out?.ok) {
             setAdding(null);
             setText('');
@@ -79,8 +82,11 @@ export default function ShotsPanel({ cameras, selectedId, onlineIds, onError }) 
                                     type="button"
                                     disabled={!online || busy}
                                     onClick={() => act(window.ptz.recallPreset(camera.id, preset.id))}
-                                    className={`${chip} bg-zinc-200 text-zinc-900 hover:bg-white disabled:opacity-40`}
+                                    className={`${chip} flex items-center gap-2 bg-zinc-200 text-zinc-900 hover:bg-white disabled:opacity-40 ${preset.thumb ? 'py-1 pl-1' : ''}`}
                                 >
+                                    {preset.thumb && (
+                                        <img src={`ptz-shot://shots/${preset.id}.jpg`} alt="" draggable={false} className="h-8 w-14 rounded object-cover" />
+                                    )}
                                     {preset.name}
                                 </button>
                             )

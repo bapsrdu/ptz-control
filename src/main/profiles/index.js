@@ -23,5 +23,14 @@ export function describeProfiles() {
         label: p.label,
         defaultPort: p.defaultPort,
         features: { ...p.features },
+        // Shown as the example in the camera form, with {host} filled in there.
+        videoUrlTemplate: p.previewUrl ? p.previewUrl('{host}') : null,
     }));
+}
+
+// The video address to use for a camera: the one the user typed, or the
+// model's usual address built from the camera's IP.
+export function videoUrlFor(camera) {
+    if (camera.previewUrl) return camera.previewUrl;
+    return getProfile(camera.profile).previewUrl?.(camera.host) ?? null;
 }

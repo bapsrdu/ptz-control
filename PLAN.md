@@ -283,13 +283,25 @@ preset work. Record which transport was detected in
 camera's web page in Chrome with DevTools on the Network tab, use every
 control once including Track Configuration, and export the log into `docs/`.
 
-### Phase 3: preview video
+### Phase 3: preview video (built)
 
-- Start go2rtc with a config generated from the camera list. Regenerate and
-  restart it when cameras change, and restart it if it exits.
-- Thumbnails and the large view play over WebRTC. Show a clear "no video" tile
-  when a stream is down. Camera control must keep working without video.
-- Capture a still frame when a preset is saved and use it as the thumbnail.
+- Each camera's RTSP sub stream (`rtsp://IP:554/live/av1` for the BZB
+  cameras, or an address typed in the camera form) is read by a small RTSP
+  client in the main process. The video is passed to the window as H.264
+  frames and decoded there with Chromium's built-in decoder (WebCodecs), once
+  per camera, then drawn on the tile and the large view.
+- This replaces the go2rtc plan: no extra program to download, bundle or keep
+  running, and no transcoding.
+- The stream must be H.264. H.265 is refused with a message telling the user
+  to switch the camera's stream to H.264.
+- RTSP logins (Basic and Digest) work when the username and password are put
+  in the video address.
+- A stream that drops is retried every 2 to 15 seconds. When there is no
+  picture, the large view says why; camera control works without video.
+- Saving a shot stores a small picture of the camera's view, shown on the shot
+  button.
+- `sim/fake-rtsp.js` streams a test clip; `npm run sim -- --video` starts fake
+  cameras with video.
 
 ### Phase 4: ATEM link
 
