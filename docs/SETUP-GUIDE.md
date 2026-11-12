@@ -1,6 +1,6 @@
-# PTZ Control: setup guide
+# Universal PTZ Controller: setup guide
 
-For anyone setting up PTZ Control at a new temple. About 30 minutes, without
+For anyone setting up Universal PTZ Controller at a new temple. About 30 minutes, without
 anything technical beyond knowing the cameras' IP addresses.
 
 ## What you need
@@ -27,14 +27,14 @@ Write the addresses down; you will type them into the app.
 
 ## 2. Install the app
 
-- **Windows:** run `PTZ-Control-Setup-<version>.exe`. If Windows says "Windows
+- **Windows:** run `Universal-PTZ-Controller-Setup-<version>.exe`. If Windows says "Windows
   protected your PC", choose **More info**, then **Run anyway**. (The app is
   not signed with a paid certificate; this warning is expected.)
 - **Mac:** open the `.dmg` for your Mac (`arm64` for M1/M2/M3/M4 Macs, `x64`
-  for older Intel Macs) and drag PTZ Control to Applications. The first time,
+  for older Intel Macs) and drag Universal PTZ Controller to Applications. The first time,
   right-click the app and choose **Open**, then **Open** again.
 
-When Windows Firewall asks whether PTZ Control may use the network, allow it
+When Windows Firewall asks whether Universal PTZ Controller may use the network, allow it
 on **private networks**. Without this the app cannot reach the cameras.
 
 ## 3. Add the cameras

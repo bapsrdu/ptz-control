@@ -86,7 +86,7 @@ test('settings and shot pictures go to a file and back onto a new computer', asy
     await b.page.getByRole('button', { name: 'Settings' }).click();
     b.page.once('dialog', (d) => d.accept());
     await b.page.getByRole('button', { name: 'Load settings from a file' }).click();
-    await b.page.getByRole('alert').getByText('not a PTZ Control settings file').waitFor();
+    await b.page.getByRole('alert').getByText('not a Universal PTZ Controller settings file').waitFor();
 });
 
 // --- A pretend camera web page: HTTP plus a WebSocket, like the BZB page. ----

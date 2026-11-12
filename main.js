@@ -11,6 +11,7 @@ import { detectMode } from './src/main/visca/detect.js';
 import { describeProfiles, videoUrlFor, getProfile } from './src/main/profiles/index.js';
 import { VideoService } from './src/main/video/service.js';
 import { ShotImages } from './src/main/store/shot-images.js';
+import { migrateOldSettings, OLD_APP_FOLDER } from './src/main/store/migrate.js';
 import { buildBackup, readBackup, replaceSettings } from './src/main/store/backup.js';
 import { recordWebPage, countRecording } from './src/main/tools/web-recorder.js';
 import { AtemLink } from './src/main/atem/link.js';
@@ -28,6 +29,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Tests point this at a temporary folder so they never touch real settings.
 if (process.env.PTZ_USER_DATA) app.setPath('userData', process.env.PTZ_USER_DATA);
+else {
+    // Bring settings over from when the app was called "PTZ Control".
+    migrateOldSettings({ from: path.join(app.getPath('appData'), OLD_APP_FOLDER), to: app.getPath('userData') });
+}
+
+// Windows groups taskbar buttons and picks their icon by this id. It must
+// match the installer's appId.
+if (process.platform === 'win32') app.setAppUserModelId('app.ptzcontrol');
 
 // This runs during live services. Log unexpected errors and keep going rather
 // than closing the window on the operator.
@@ -349,9 +358,9 @@ const dateStamp = () => new Date().toISOString().slice(0, 10);
 
 ipcMain.handle('settings:export', async () => {
     const res = await dialog.showSaveDialog(win, {
-        title: 'Save PTZ Control settings',
-        defaultPath: path.join(app.getPath('documents'), `PTZ Control settings ${dateStamp()}.json`),
-        filters: [{ name: 'PTZ Control settings', extensions: ['json'] }],
+        title: 'Save Universal PTZ Controller settings',
+        defaultPath: path.join(app.getPath('documents'), `Universal PTZ Controller settings ${dateStamp()}.json`),
+        filters: [{ name: 'Universal PTZ Controller settings', extensions: ['json'] }],
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     try {
@@ -365,9 +374,9 @@ ipcMain.handle('settings:export', async () => {
 
 ipcMain.handle('settings:import', async () => {
     const res = await dialog.showOpenDialog(win, {
-        title: 'Load PTZ Control settings',
+        title: 'Load Universal PTZ Controller settings',
         properties: ['openFile'],
-        filters: [{ name: 'PTZ Control settings', extensions: ['json'] }],
+        filters: [{ name: 'Universal PTZ Controller settings', extensions: ['json'] }],
     });
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
     let text;
@@ -422,7 +431,9 @@ function createWindow() {
         minWidth: 1000,
         minHeight: 700,
         backgroundColor: '#0f1115',
-        title: 'PTZ Control',
+        title: 'Universal PTZ Controller',
+        // Window and taskbar icon (Windows and Linux; a Mac uses the app's own icon).
+        icon: path.join(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
         show: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),

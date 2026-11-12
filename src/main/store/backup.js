@@ -27,10 +27,10 @@ export function readBackup(text) {
     try {
         data = JSON.parse(text);
     } catch {
-        return { ok: false, message: 'This file is not a PTZ Control settings file (it could not be read).' };
+        return { ok: false, message: 'This file is not a Universal PTZ Controller settings file (it could not be read).' };
     }
     if (data?.kind !== BACKUP_KIND || !data.settings) {
-        return { ok: false, message: 'This file is not a PTZ Control settings file.' };
+        return { ok: false, message: 'This file is not a Universal PTZ Controller settings file.' };
     }
     const settings = normalizeSettings(data.settings);
     const pictures = data.pictures && typeof data.pictures === 'object' ? data.pictures : {};

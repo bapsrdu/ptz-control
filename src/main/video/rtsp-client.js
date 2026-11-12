@@ -14,7 +14,7 @@ import { EventEmitter } from 'node:events';
 import { parseRtp } from './rtp.js';
 import { H264Depacketizer, toAnnexB, codecString } from './h264.js';
 
-const USER_AGENT = 'PTZ Control';
+const USER_AGENT = 'Universal PTZ Controller';
 const NO_VIDEO_MS = 6000;
 
 export class RtspClient extends EventEmitter {

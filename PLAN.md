@@ -1,4 +1,4 @@
-# Temple PTZ Control: build plan
+# Universal Universal PTZ Controllerler: build plan
 
 A desktop app (Windows and Mac) that lets one volunteer frame and recall shots
 on a temple's PTZ cameras from a single screen. It is built first for BAPS
@@ -7,6 +7,13 @@ several. Modelled on the Churchfront "CueVideo" demo video.
 
 This document is the brief for whoever builds the app. Build the phases in
 order. Each phase ends with something that can be run and checked.
+
+The app was called "PTZ Control" up to version 0.9. From 0.10 it is
+**Universal PTZ Controller**, with a neon "U" logo (a PTZ camera on its stand
+inside the U) in the style of the Broadcast Controller logo; the logo is drawn
+by `build/make-icon.py`. On first start under the new name, settings and shot
+pictures are copied from the old "PTZ Control" folder. The installer's appId
+is unchanged, so it upgrades an existing install in place.
 
 ## 1. Decisions already made
 
@@ -381,7 +388,7 @@ services.
 ### Phase 8: packaging and hand-out (built)
 
 - `electron-builder` settings in `package.json`: a Windows installer
-  (`PTZ-Control-Setup-<version>.exe`, per-user, no admin rights needed) and
+  (`Universal-PTZ-Controller-Setup-<version>.exe`, per-user, no admin rights needed) and
   Mac disk images for Apple Silicon and Intel. Not code-signed; the setup
   guide explains the first-run warnings.
 - `.github/workflows/build-installers.yml` builds both on GitHub's Windows and

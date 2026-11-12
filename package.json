@@ -1,8 +1,8 @@
 {
-  "name": "ptz-control",
-  "productName": "PTZ Control",
-  "version": "0.9.0",
-  "description": "Simple PTZ camera control for temple AV volunteers",
+  "name": "universal-ptz-controller",
+  "productName": "Universal PTZ Controller",
+  "version": "0.10.0",
+  "description": "Universal PTZ Controller: simple PTZ camera control for temple AV volunteers",
   "main": "main.js",
   "type": "module",
   "private": true,
@@ -45,11 +45,11 @@
   "allowScripts": {
     "electron": true
   },
-  "author": "PTZ Control contributors",
+  "author": "Universal PTZ Controller contributors",
   "build": {
     "appId": "app.ptzcontrol",
-    "productName": "PTZ Control",
-    "copyright": "PTZ Control contributors",
+    "productName": "Universal PTZ Controller",
+    "copyright": "Universal PTZ Controller contributors",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -60,6 +60,7 @@
       "package.json",
       "src/**/*",
       "dist-renderer/**/*",
+      "assets/**/*",
       "sim/fake-atem.js"
     ],
     "asar": true,
@@ -75,10 +76,10 @@
         }
       ],
       "category": "public.app-category.video",
-      "artifactName": "PTZ-Control-${version}-mac-${arch}.${ext}"
+      "artifactName": "Universal-PTZ-Controller-${version}-mac-${arch}.${ext}"
     },
     "dmg": {
-      "title": "PTZ Control ${version}"
+      "title": "Universal PTZ Controller ${version}"
     },
     "win": {
       "target": [
@@ -89,7 +90,8 @@
           ]
         }
       ],
-      "artifactName": "PTZ-Control-Setup-${version}.${ext}"
+      "artifactName": "Universal-PTZ-Controller-Setup-${version}.${ext}",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -97,7 +99,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PTZ Control"
+      "shortcutName": "Universal PTZ Controller",
+      "uninstallDisplayName": "Universal PTZ Controller"
     },
     "linux": {
       "target": [

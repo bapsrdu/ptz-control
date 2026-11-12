@@ -1,4 +1,4 @@
-# PTZ Control
+# Universal PTZ Controller
 
 A simple desktop app for running PTZ cameras during services. A volunteer picks
 a camera, frames it with a joystick and zoom lever, and saves or recalls named
@@ -164,6 +164,7 @@ sim/fake-atem.js         Pretend ATEM for the app tests (PTZ_FAKE_ATEM=1)
 tests/                   Unit and network tests (node --test)
 e2e/                     Tests that drive the real app window
 docs/                    Setup guide for new temples, on-site checklist
-build/icon.png           App icon (the installers make the Windows and Mac icons from it)
+build/icon.png           App icon for the installers; build/make-icon.py draws it
+assets/                  Window and taskbar icon (icon.ico for Windows, icon.png)
 .github/workflows/       CI (tests on every push) and the installer builds
 ```

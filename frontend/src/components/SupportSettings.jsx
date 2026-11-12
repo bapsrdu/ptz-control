@@ -69,7 +69,7 @@ export default function SupportSettings({ cameras, version, onError, onInfo }) {
                 </div>
             )}
 
-            <p className="text-xs text-zinc-500" data-testid="app-version">PTZ Control version {version}</p>
+            <p className="text-xs text-zinc-500" data-testid="app-version">Universal PTZ Controller version {version}</p>
         </section>
     );
 }

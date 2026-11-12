@@ -16,6 +16,6 @@ test('reads a settings file and cleans what it loads', () => {
 
 test('refuses files that are not settings files', () => {
     assert.match(readBackup('not json').message, /could not be read/);
-    assert.match(readBackup('{"kind":"something-else","settings":{}}').message, /not a PTZ Control settings file/);
-    assert.match(readBackup('{"kind":"ptz-control-settings"}').message, /not a PTZ Control settings file/);
+    assert.match(readBackup('{"kind":"something-else","settings":{}}').message, /not a Universal PTZ Controller settings file/);
+    assert.match(readBackup('{"kind":"ptz-control-settings"}').message, /not a Universal PTZ Controller settings file/);
 });

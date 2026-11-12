@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Settings, Video } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import CameraTiles from './components/CameraTiles.jsx';
 import FramePanel from './components/FramePanel.jsx';
 import ShotsPanel from './components/ShotsPanel.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { statusOf } from './components/status.js';
 import VideoView from './components/VideoView.jsx';
+import logo from './assets/logo.png';
 import LiveView from './components/LiveView.jsx';
 import LowerThirdsButton from './components/LowerThirdsButton.jsx';
 import ExposurePanel from './components/ExposurePanel.jsx';
@@ -39,8 +40,8 @@ export default function App() {
     return (
         <div className="flex h-full flex-col">
             <header className="flex items-center gap-3 border-b border-edge px-5 py-3">
-                <Video size={20} className="text-accent" />
-                <span className="font-semibold">PTZ Control</span>
+                <img src={logo} alt="" className="h-7 w-7 rounded-md" draggable={false} />
+                <span className="font-semibold">Universal PTZ Controller</span>
                 <span className="text-sm text-zinc-500">{summary(state)}</span>
                 <AtemBadge atem={state.atem} configured={Boolean(state.settings.atem.host)} />
                 {view.name === 'control' && (
@@ -110,8 +111,8 @@ function Welcome({ onAdd, onError }) {
     }
     return (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-            <Video size={48} className="text-zinc-600" />
-            <h1 className="text-2xl font-semibold">Welcome</h1>
+            <img src={logo} alt="" className="h-28 w-28 rounded-2xl" draggable={false} />
+            <h1 className="text-2xl font-semibold">Welcome to Universal PTZ Controller</h1>
             <p className="max-w-md text-zinc-400">
                 Add your PTZ cameras to get started. You will need each camera's IP address.
             </p>
