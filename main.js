@@ -63,8 +63,12 @@ const store = new S.SettingsStore(app.getPath('userData'));
 const shotImages = new ShotImages(app.getPath('userData'));
 const video = new VideoService();
 const atem = new AtemLink({ createAtem });
-const tracking = new Map(); // cameraId -> last tracking state set from this app
+const tracking = new Map(); // cameraId -> tracking on/off, from the camera when it can tell us
+const trackingSettings = new Map(); // cameraId -> { mode, headroom }
+// PTZ_WEB_PORT is for the tests, which cannot use port 80.
+const testWebPort = process.env.PTZ_WEB_PORT ? Number(process.env.PTZ_WEB_PORT) : null;
 const manager = new CameraManager({
+    webPort: testWebPort,
     onModeDetected: (id, mode) => store.apply(S.setCameraMode, id, mode),
 });
 
@@ -73,6 +77,7 @@ function snapshot() {
         settings: store.get(),
         statuses: manager.statuses(),
         tracking: Object.fromEntries(tracking),
+        trackingSettings: Object.fromEntries(trackingSettings),
         video: video.statuses(),
         atem: atemView,
         profiles: describeProfiles(),
@@ -141,14 +146,43 @@ store.on('change', (settings) => {
     for (const id of tracking.keys()) {
         if (!settings.cameras.some((c) => c.id === id)) tracking.delete(id);
     }
+    for (const id of trackingSettings.keys()) {
+        if (!settings.cameras.some((c) => c.id === id)) trackingSettings.delete(id);
+    }
     pushState();
 });
 manager.on('status', (cameraId, status) => {
     // A camera that just came back may have forgotten its tally state.
     if (status.state !== 'online') tallySync.forget(cameraId);
-    else refreshAtem();
+    else {
+        refreshAtem();
+        readTracking(cameraId);
+    }
     pushState();
 });
+
+// Tracking on/off, mode and headroom as the camera reports them, so the app
+// stays right when someone changes tracking with the remote or the camera's
+// own page. Read when a camera connects and every 10 seconds.
+async function readTracking(id) {
+    const cam = camera(id);
+    if (!cam || !getProfile(cam.profile).features.trackingSettings) return;
+    const out = await manager.readTrackingSettings(id);
+    if (!out.ok) return;
+    applyTracking(id, out.settings);
+}
+
+function applyTracking(id, { enabled, mode, headroom }) {
+    const before = JSON.stringify([tracking.get(id), trackingSettings.get(id)]);
+    tracking.set(id, enabled);
+    trackingSettings.set(id, { mode, headroom });
+    if (JSON.stringify([tracking.get(id), trackingSettings.get(id)]) !== before) pushState();
+}
+
+setInterval(() => {
+    const statuses = manager.statuses();
+    for (const c of store.get().cameras) if (statuses[c.id]?.state === 'online') readTracking(c.id);
+}, 10000).unref();
 video.on('status', pushState);
 video.on('frame', (cameraId, frame) => {
     // Nobody can see a minimised window; the decoder restarts on the next key frame.
@@ -305,8 +339,33 @@ ipcMain.handle('ptz:tracking', async (_e, id, on) => {
     if (out.ok) {
         tracking.set(id, Boolean(on));
         pushState();
+        // Confirm from the camera a moment later.
+        setTimeout(() => readTracking(id), 800);
     }
     return out;
+});
+
+ipcMain.handle('ptz:trackingSettings', async (_e, id, patch) => {
+    if (!camera(id)) return unknownCamera;
+    const out = await manager.setTrackingSettings(id, patch ?? {});
+    if (out.ok) applyTracking(id, out.settings);
+    return out;
+});
+
+// The camera's own web page, for settings this app does not have (such as
+// setting up tracking zones). Its own window; logins are not kept.
+ipcMain.handle('tools:openWebPage', (_e, id) => {
+    const cam = camera(id);
+    if (!cam) return unknownCamera;
+    const page = new BrowserWindow({
+        width: 1280,
+        height: 860,
+        title: `${cam.name} web page`,
+        webPreferences: { partition: `camera-page-${cam.id}`, contextIsolation: true, sandbox: true, nodeIntegration: false },
+    });
+    page.removeMenu();
+    page.loadURL(`http://${cam.host}${testWebPort ? `:${testWebPort}` : ''}/`).catch(() => {});
+    return { ok: true };
 });
 
 // --- Shots ------------------------------------------------------------------
@@ -398,8 +457,7 @@ ipcMain.handle('settings:import', async () => {
 ipcMain.handle('tools:recordWebPage', async (_e, cameraId) => {
     const cam = camera(cameraId);
     if (!cam) return unknownCamera;
-    // PTZ_WEB_PORT is for the tests, which cannot use port 80.
-    const port = process.env.PTZ_WEB_PORT ? `:${Number(process.env.PTZ_WEB_PORT)}` : '';
+    const port = testWebPort ? `:${testWebPort}` : '';
     const result = await recordWebPage({ url: `http://${cam.host}${port}/`, parent: win, title: `${cam.name} (${cam.host})` });
     if (!result.ok) return result;
     const counts = countRecording(result.recording);

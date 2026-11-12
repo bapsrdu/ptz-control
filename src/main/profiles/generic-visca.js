@@ -7,7 +7,7 @@ export const genericVisca = Object.freeze({
     panSpeedMax: 0x18,
     tiltSpeedMax: 0x14,
     zoomSpeedMax: 7,
-    features: Object.freeze({ tracking: false, tally: false }),
+    features: Object.freeze({ tracking: false, tally: false, trackingSettings: false }),
     trackingCommand: null,
     tallyCommands: null,
     previewUrl: null,

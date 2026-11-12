@@ -10,7 +10,10 @@ export const bzbAdamo = Object.freeze({
     panSpeedMax: 0x18,
     tiltSpeedMax: 0x14,
     zoomSpeedMax: 7,
-    features: Object.freeze({ tracking: true, tally: true }),
+    // trackingSettings: Presenter/Zone and headroom, set through the camera's
+    // web page interface (see src/main/cameras/bzb-web.js).
+    features: Object.freeze({ tracking: true, tally: true, trackingSettings: true }),
+    webPort: 80,
 
     // "Auto Tracking On/Off" in the manual's VISCA table.
     trackingCommand(address, on) {

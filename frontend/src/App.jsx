@@ -216,6 +216,7 @@ function ControlView({ state, onError }) {
                         profile={profile}
                         online={status.state === 'online'}
                         trackingOn={Boolean(tracking[selected.id])}
+                        trackingSettings={state.trackingSettings?.[selected.id] ?? null}
                         power={statuses[selected.id]?.power ?? null}
                         live={live}
                         exposureOpen={exposureOpen}

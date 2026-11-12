@@ -8,7 +8,7 @@ import { useDrive } from '../useDrive.js';
 const SPEED_DEFAULT = 0.5;
 
 // Step 2: everything for framing the selected camera.
-export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
+export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, trackingSettings = null, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
     const [focusMode, setFocusMode] = useState({}); // cameraId -> 'auto' | 'manual'
     const [localSpeed, setLocalSpeed] = useState(speed);
 
@@ -87,6 +87,50 @@ export default function FramePanel({ camera, profile, online, power = null, live
                             >
                                 <PersonStanding size={16} /> {trackingOn ? 'On' : 'Off'}
                             </button>
+                            {profile.features.trackingSettings && (
+                                <>
+                                    <div className="flex overflow-hidden rounded-lg" role="group" aria-label="Tracking mode">
+                                        {[['presenter', 'Presenter'], ['zone', 'Zone']].map(([value, label]) => (
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                disabled={disabled || !trackingSettings}
+                                                aria-pressed={trackingSettings?.mode === value}
+                                                title={value === 'presenter' ? 'Follows the presenter everywhere' : 'Moves only between the zones set up on the camera'}
+                                                className={`${pill(trackingSettings?.mode === value)} rounded-none`}
+                                                onClick={() => run(window.ptz.trackingSettings(camera.id, { mode: value }))}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {trackingSettings?.mode === 'zone' ? (
+                                        <button
+                                            type="button"
+                                            disabled={!online}
+                                            title="Zones are set up on the camera's own web page"
+                                            className={pill(false)}
+                                            onClick={() => run(window.ptz.openWebPage(camera.id))}
+                                        >
+                                            Set up zones
+                                        </button>
+                                    ) : (
+                                        <select
+                                            aria-label="Headroom"
+                                            title="How much space to leave above the presenter's head"
+                                            disabled={disabled || !trackingSettings}
+                                            value={trackingSettings?.headroom ?? ''}
+                                            onChange={(e) => run(window.ptz.trackingSettings(camera.id, { headroom: e.target.value }))}
+                                            className="rounded-lg border border-edge bg-panel-2 px-2 py-1.5 text-sm text-zinc-200 disabled:opacity-40"
+                                        >
+                                            {!trackingSettings?.headroom && <option value="">Headroom</option>}
+                                            <option value="low">Headroom: low</option>
+                                            <option value="medium">Headroom: medium</option>
+                                            <option value="high">Headroom: high</option>
+                                        </select>
+                                    )}
+                                </>
+                            )}
                         </div>
                     )}
 

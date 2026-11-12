@@ -115,17 +115,16 @@ On the controls:
       Standby. Wake up brings it back, and its shots still work.
 - [ ] Standby all / Wake all from Settings.
 
-### For phase 6
+## Check 5: tracking settings (phase 6)
 
-Chrome's HAR export came out empty, so the app has its own recorder.
-
-- [ ] In the app: Settings, "Record a camera's web page". Pick one BZB camera
-      and press **Open and record**. The camera's page opens in a new window.
-- [ ] Log in. Then use each of these once: Track Configuration (tracking
-      On/Off, Presenter and Zone, each Headroom setting, set a zone, the
-      Tracking Lost Preset), and Image Style if there is one.
-- [ ] Close the camera window. Save the file, and send it. It includes the
-      camera login, so change the camera password afterwards if that matters.
+- [ ] The Tracking button shows On or Off the same as the camera. Turn
+      tracking on with the IR remote (F2): within 10 seconds the app shows On.
+- [ ] Presenter / Zone: switching in the app changes the camera's web page
+      setting (Track Configuration) the same way.
+- [ ] Headroom: choose low, medium and high in the app, and check the camera's
+      web page shows the same word each time. If the words are swapped, note
+      which: ______
+- [ ] Zone mode: **Set up zones** opens the camera's page in a window.
 
 ### Results
 

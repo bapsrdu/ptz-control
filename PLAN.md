@@ -356,15 +356,46 @@ control once including Track Configuration, and export the log into `docs/`.
 - The one-push white balance trigger (`8x 01 04 10 05 FF`) is standard VISCA
   but not in the BZB manual: verify on site.
 
-### Phase 6: web-page-only features
+### Phase 6: tracking mode and headroom (built)
 
-Using a recording of the camera's web page (Settings, Record a camera's web
-page; Chrome HAR exports came out empty at Raleigh), add tracking mode,
-headroom, zone setup, "tracking lost" preset and picture style to the BZB
-profile. The camera's web page has a WebSocket on port 8088 (manual, Network
-Port), which is the likely channel for these. If the camera requires a login
-for these calls, add username and password fields to the camera and store the
-password with Electron `safeStorage`, not in the JSON file.
+From a recording of the BG-ADAMO-4KND25X web page (Settings, Record a camera's
+web page). The page's WebSocket on port 8088 only carries the live video; its
+settings go to `GET /ajaxcom?szCmd=<JSON>`:
+
+| Setting | Command |
+|---|---|
+| Read tracking settings | `{"GetEnv":{"MonoTracking":{"nChannel":-1}}}` |
+| Tracking on/off | `{"SetEnv":{"MonoTracking":{"bEnable":1}}}` (the app uses VISCA for this) |
+| Presenter / Zone | `{"SetEnv":{"MonoTracking":{"nTrackMode":0}}}` / `1` |
+| Headroom | `{"SetEnv":{"MonoTracking":{"nHeadRoom":0}}}`, 1, 2 |
+| Tracking Lost Preset | `{"SetEnv":{"MonoTracking":{"nLostPosNo":4}}}` |
+| Zone presets | `{"SysCtrl":{"AreaTrack":{"nChanel":0,"szPtzCmd":"preset_set","byValue":0}}}` plus a `PictureTrack` upload |
+
+Replies are JSON with `nRetVal: 0` for success. The page logs in with
+`POST /login/login` (username, password); no cookie is set.
+
+Built:
+
+- Tracking row: On/Off, Presenter / Zone, and Headroom (low, medium, high).
+  In Zone mode, **Set up zones** opens the camera's own page in a window.
+- Tracking on/off, mode and headroom are read from the camera when it
+  connects and every 10 seconds, so the app stays right when someone uses the
+  IR remote or the camera's page.
+- If the camera answers with its login page instead of JSON, the app logs in
+  with admin/admin once and tries again.
+- `sim/fake-bzb-web.js` answers these commands for the tests.
+
+Not built, and why:
+
+- Headroom numbers 0, 1, 2 are taken as low, medium, high (the order of the
+  page's list). The labels are in a script the recorder does not keep:
+  verify on site.
+- Tracking Lost Preset: what the numbers 0 to 4 mean is not clear from the
+  recording.
+- Zone setup: it needs the camera pointed at each zone and a picture uploaded;
+  the camera's own page does it well.
+- A camera web login other than admin/admin: add username and password fields
+  (password in Electron `safeStorage`) if a temple changes it.
 
 ### Phase 7 (optional): app-side tracking
 

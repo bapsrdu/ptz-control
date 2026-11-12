@@ -11,6 +11,7 @@ import { detectMode } from '../visca/detect.js';
 import * as V from '../visca/commands.js';
 import { getProfile } from '../profiles/index.js';
 import { DriveChannel, joystickToDrive, sliderToZoom } from './motion.js';
+import { BzbWeb } from './bzb-web.js';
 
 const DETECT_RETRY_MS = 10000;
 const ADDRESS = 1; // VISCA over IP cameras answer on address 1.
@@ -21,12 +22,13 @@ function linkKey(camera) {
 
 // Events: 'status' (cameraId, status), 'notice' (cameraId, message)
 export class CameraManager extends EventEmitter {
-    constructor({ onModeDetected = () => {}, clientOptions = {}, detectOptions = {}, driveOptions = {} } = {}) {
+    constructor({ onModeDetected = () => {}, clientOptions = {}, detectOptions = {}, driveOptions = {}, webPort = null } = {}) {
         super();
         this.onModeDetected = onModeDetected;
         this.clientOptions = clientOptions;
         this.detectOptions = detectOptions;
         this.driveOptions = driveOptions;
+        this.webPort = webPort; // tests point this at a fake camera web page
         this.entries = new Map(); // cameraId -> entry
     }
 
@@ -59,6 +61,9 @@ export class CameraManager extends EventEmitter {
             key: linkKey(camera),
             profile: getProfile(camera.profile),
             client: null,
+            web: getProfile(camera.profile).features.trackingSettings
+                ? new BzbWeb({ host: camera.host, port: this.webPort ?? getProfile(camera.profile).webPort ?? 80 })
+                : null,
             detectTimer: null,
             disposed: false,
             status: { state: 'connecting', message: '' },
@@ -333,6 +338,31 @@ export class CameraManager extends EventEmitter {
             bright: level(await ask('bright')),
         };
         return { ok: true, values };
+    }
+
+    // Tracking mode and headroom, from the camera's web page interface.
+    // Resolves to { ok, settings: { enabled, mode, headroom } } or { ok: false, message }.
+    async readTrackingSettings(id) {
+        const entry = this.#entry(id);
+        if (!entry?.web) return { ok: false, message: 'This camera has no tracking settings.' };
+        try {
+            return { ok: true, settings: await entry.web.getTracking() };
+        } catch (err) {
+            return { ok: false, message: err.message };
+        }
+    }
+
+    async setTrackingSettings(id, patch) {
+        const entry = this.#entry(id);
+        if (!entry?.web) return { ok: false, message: 'This camera has no tracking settings.' };
+        const clean = {};
+        if (patch?.mode !== undefined) clean.mode = patch.mode;
+        if (patch?.headroom !== undefined) clean.headroom = patch.headroom;
+        try {
+            return { ok: true, settings: await entry.web.setTracking(clean) };
+        } catch (err) {
+            return { ok: false, message: err.message };
+        }
     }
 
     async dispose() {
