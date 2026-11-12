@@ -134,3 +134,15 @@ test('ATEM settings: address, watched list, lower-thirds key, camera inputs', ()
     assert.equal(cleared.cameras[0].atemInput, null);
     assert.deepEqual(S.normalizeSettings({ atem: { host: 'nope nope', watched: 'x' } }).atem.watched, []);
 });
+
+test('shots can be reordered within a camera', () => {
+    let s = withCameras({ name: 'A', host: '10.0.0.1' });
+    const id = s.cameras[0].id;
+    for (const [name, number] of [['One', 1], ['Two', 2], ['Three', 3]]) s = S.addPreset(s, id, { name, number }).settings;
+    const [one, , three] = s.cameras[0].presets;
+    s = S.movePreset(s, id, three.id, 0).settings;
+    assert.deepEqual(s.cameras[0].presets.map((p) => p.name), ['Three', 'One', 'Two']);
+    s = S.movePreset(s, id, one.id, 99).settings;
+    assert.deepEqual(s.cameras[0].presets.map((p) => p.name), ['Three', 'Two', 'One']);
+    assert.equal(S.movePreset(s, id, 'missing', 0).ok, false);
+});

@@ -76,6 +76,16 @@ const trackingSettings = new Map(); // cameraId -> { mode, headroom }
 // App tracking (phase 7): cameraId -> { framing, controller, status }. One
 // camera at a time, so the person detector does not overload the computer.
 const appTracking = new Map();
+// Which saved shot each camera is sitting on, so the shot pad can light it.
+// Cleared as soon as the camera is moved any other way.
+const onShot = new Map(); // cameraId -> presetId
+
+function setOnShot(id, presetId) {
+    const before = onShot.get(id) ?? null;
+    if (presetId) onShot.set(id, presetId);
+    else onShot.delete(id);
+    if (before !== (presetId ?? null)) pushState();
+}
 // PTZ_WEB_PORT is for the tests, which cannot use port 80.
 const testWebPort = process.env.PTZ_WEB_PORT ? Number(process.env.PTZ_WEB_PORT) : null;
 const manager = new CameraManager({
@@ -90,6 +100,7 @@ function snapshot() {
         tracking: Object.fromEntries(tracking),
         trackingSettings: Object.fromEntries(trackingSettings),
         appTracking: Object.fromEntries([...appTracking].map(([id, a]) => [id, { framing: a.framing, status: a.status }])),
+        onShot: Object.fromEntries(onShot),
         video: video.statuses(),
         atem: atemView,
         profiles: describeProfiles(),
@@ -314,7 +325,10 @@ function takeOver(id) {
 ipcMain.on('ptz:move', (_e, id, v) => {
     if (!isId(id)) return;
     const vector = { x: unit(v?.x), y: unit(v?.y) };
-    if (Math.abs(vector.x) > TAKEOVER_DEAD_ZONE || Math.abs(vector.y) > TAKEOVER_DEAD_ZONE) takeOver(id);
+    if (Math.abs(vector.x) > TAKEOVER_DEAD_ZONE || Math.abs(vector.y) > TAKEOVER_DEAD_ZONE) {
+        takeOver(id);
+        setOnShot(id, null);
+    }
     manager.move(id, vector, speed());
 });
 ipcMain.on('ptz:stopMove', (_e, id) => {
@@ -322,7 +336,10 @@ ipcMain.on('ptz:stopMove', (_e, id) => {
 });
 ipcMain.on('ptz:zoom', (_e, id, value) => {
     if (!isId(id)) return;
-    if (Math.abs(unit(value)) > TAKEOVER_DEAD_ZONE) takeOver(id);
+    if (Math.abs(unit(value)) > TAKEOVER_DEAD_ZONE) {
+        takeOver(id);
+        setOnShot(id, null);
+    }
     manager.zoom(id, unit(value), speed());
 });
 ipcMain.on('ptz:stopZoom', (_e, id) => {
@@ -336,6 +353,7 @@ ipcMain.on('ptz:stopAll', () => manager.stopAll());
 ipcMain.handle('ptz:home', (_e, id) => {
     if (!camera(id)) return unknownCamera;
     takeOver(id);
+    setOnShot(id, null);
     return manager.home(id);
 });
 
@@ -344,7 +362,10 @@ ipcMain.handle('ptz:readExposure', (_e, id) => (camera(id) ? manager.readExposur
 
 ipcMain.handle('ptz:power', (_e, id, on) => {
     if (!camera(id)) return unknownCamera;
-    if (!on) tracking.delete(id);
+    if (!on) {
+        tracking.delete(id);
+        setOnShot(id, null);
+    }
     return manager.power(id, Boolean(on));
 });
 
@@ -366,7 +387,10 @@ ipcMain.handle('ptz:focusMode', (_e, id, mode) => {
 ipcMain.handle('ptz:tracking', async (_e, id, on) => {
     if (!camera(id)) return unknownCamera;
     // The camera's own tracking and app tracking must not both steer.
-    if (on) stopAppTracking(id);
+    if (on) {
+        stopAppTracking(id);
+        setOnShot(id, null);
+    }
     const out = await manager.tracking(id, Boolean(on));
     if (out.ok) {
         tracking.set(id, Boolean(on));
@@ -421,6 +445,7 @@ function onObservation(id, points) {
     if (!entry) return;
     const out = entry.controller.update(points && typeof points === 'object' ? points : null);
     manager.autoDrive(id, out);
+    if (out.pan || out.tilt || out.zoom) setOnShot(id, null);
     if (entry.status !== entry.controller.status) {
         entry.status = entry.controller.status;
         pushState();
@@ -478,6 +503,8 @@ ipcMain.handle('preset:save', async (_e, cameraId, name, picture) => {
     if (picture && shotImages.save(out.preset.id, picture)) {
         store.apply(S.setPresetThumb, cameraId, out.preset.id, true);
     }
+    // The camera is now sitting on the shot it just saved.
+    setOnShot(cameraId, out.preset.id);
     return { ok: true, preset: out.preset };
 });
 
@@ -485,7 +512,15 @@ ipcMain.handle('preset:recall', (_e, cameraId, presetId) => {
     const p = preset(cameraId, presetId);
     if (!p) return { ok: false, message: 'That shot no longer exists.' };
     takeOver(cameraId);
-    return manager.recallPreset(cameraId, p.number);
+    return manager.recallPreset(cameraId, p.number).then((out) => {
+        if (out.ok) setOnShot(cameraId, presetId);
+        return out;
+    });
+});
+
+ipcMain.handle('preset:move', (_e, cameraId, presetId, toIndex) => {
+    const out = store.apply(S.movePreset, cameraId, presetId, toIndex);
+    return out.ok ? { ok: true } : { ok: false, message: Object.values(out.errors)[0] };
 });
 
 ipcMain.handle('preset:rename', (_e, cameraId, presetId, name) => {
@@ -500,7 +535,10 @@ ipcMain.handle('preset:delete', async (_e, cameraId, presetId) => {
     // must not stop the user removing a shot from the list.
     await manager.clearPreset(cameraId, p.number);
     const out = store.apply(S.removePreset, cameraId, presetId);
-    if (out.ok) shotImages.remove(presetId);
+    if (out.ok) {
+        shotImages.remove(presetId);
+        if (onShot.get(cameraId) === presetId) setOnShot(cameraId, null);
+    }
     return out.ok ? { ok: true } : { ok: false, message: Object.values(out.errors)[0] };
 });
 

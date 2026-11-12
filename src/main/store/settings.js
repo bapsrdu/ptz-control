@@ -274,6 +274,19 @@ export function setPresetThumb(settings, cameraId, presetId, thumb) {
     });
 }
 
+// Moves a shot to a new place in its camera's list (0 = first).
+export function movePreset(settings, cameraId, presetId, toIndex) {
+    return withCamera(settings, cameraId, (camera) => {
+        const from = camera.presets.findIndex((p) => p.id === presetId);
+        if (from === -1) return failure({ form: 'This shot no longer exists.' });
+        const to = Math.max(0, Math.min(camera.presets.length - 1, Math.round(Number(toIndex) || 0)));
+        const presets = [...camera.presets];
+        const [shot] = presets.splice(from, 1);
+        presets.splice(to, 0, shot);
+        return { ok: true, camera: { ...camera, presets } };
+    });
+}
+
 export function removePreset(settings, cameraId, presetId) {
     return withCamera(settings, cameraId, (camera) => {
         if (!camera.presets.some((p) => p.id === presetId)) return failure({ form: 'This shot no longer exists.' });

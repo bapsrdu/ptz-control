@@ -73,7 +73,8 @@ async function waitForLog(camera, hex, timeoutMs = 3000) {
 test('first run: add a camera, see its video, move it, save and recall a shot', async (t) => {
     const fake = await new FakeCamera({ mode: 'udp-sony' }).start();
     const rtsp = await new FakeRtspServer().start();
-    const { app, page } = await launch(tempDir());
+    const userData = tempDir();
+    const { app, page } = await launch(userData);
     t.after(async () => { await app.close(); await fake.stop(); await rtsp.stop(); });
 
     await page.getByText('Welcome').waitFor();
@@ -137,10 +138,12 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Pulpit' }).waitFor();
     await waitForLog(fake, '81 01 04 3F 01 01 FF');
-    // The shot shows a picture of what the camera saw.
-    const thumb = page.getByRole('button', { name: 'Pulpit' }).locator('img');
-    await thumb.waitFor();
-    await page.waitForFunction((img) => img.complete && img.naturalWidth === 320, await thumb.elementHandle());
+    // The camera now sits on the shot it just saved, and a picture of what it
+    // saw is kept with the shot.
+    await page.getByRole('button', { name: 'Pulpit', pressed: true }).waitFor();
+    const pictures = fs.readdirSync(path.join(userData, 'shots'));
+    assert.equal(pictures.length, 1);
+    assert.ok(fs.statSync(path.join(userData, 'shots', pictures[0])).size > 1000);
     await page.getByRole('button', { name: 'Pulpit' }).click();
     await waitForLog(fake, '81 01 04 3F 02 01 FF');
     await screenshot(page, '05-control-with-shot');

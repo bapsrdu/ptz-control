@@ -76,8 +76,9 @@ test('settings and shot pictures go to a file and back onto a new computer', asy
     await b.app.evaluate(({ dialog }, f) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] }); }, file);
     await b.page.getByRole('button', { name: 'Or load settings saved on another computer' }).click();
     await b.page.locator('[data-testid=camera-tile][data-state=online]').waitFor();
-    const thumb = b.page.getByRole('button', { name: 'Pulpit' }).locator('img');
-    await b.page.waitForFunction((img) => img.complete && img.naturalWidth === 320, await thumb.elementHandle());
+    await b.page.getByRole('button', { name: 'Pulpit' }).waitFor();
+    // The shot's picture came across too.
+    assert.equal(fs.readFileSync(path.join(second, 'shots', 'shot-1.jpg')).toString('base64'), jpeg);
 
     // A file that is not a settings file is refused in plain words.
     const junk = path.join(tmp('ptz-junk-'), 'junk.json');

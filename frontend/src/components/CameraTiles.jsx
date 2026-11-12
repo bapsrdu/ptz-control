@@ -6,7 +6,11 @@ import { statusOf } from './status.js';
 // below will move. It does not change what is on air.
 export default function CameraTiles({ cameras, statuses, video, tracking, selectedId, live = [], next = [], onSelect }) {
     return (
-        <div className="flex flex-wrap gap-3" data-testid="camera-tiles">
+        // One row, whatever the number of cameras: extra tiles scroll sideways
+        // rather than wrapping, so the video views above never shrink. The
+        // scroll bar's space is always kept (its track is invisible), so the
+        // row is the same height with 1 camera or 20.
+        <div className="flex min-w-0 flex-1 gap-3 overflow-x-scroll pb-1" data-testid="camera-tiles">
             {cameras.map((camera, index) => {
                 const status = statusOf(statuses, camera.id);
                 const selected = camera.id === selectedId;
@@ -20,7 +24,7 @@ export default function CameraTiles({ cameras, statuses, video, tracking, select
                         data-state={status.state}
                         aria-pressed={selected}
                         onClick={() => onSelect(camera.id)}
-                        className={`group w-36 overflow-hidden rounded-xl border-2 bg-panel-2 text-left ${selected ? 'border-accent' : isLive ? 'border-live/60' : 'border-transparent hover:border-edge'}`}
+                        className={`group w-36 shrink-0 overflow-hidden rounded-xl border-2 bg-panel-2 text-left ${selected ? 'border-accent' : isLive ? 'border-live/60' : 'border-transparent hover:border-edge'}`}
                     >
                         <div className="relative flex aspect-video items-center justify-center bg-black/40">
                             <VideoView cameraId={camera.id} status={video?.[camera.id]} />

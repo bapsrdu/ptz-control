@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Settings } from 'lucide-react';
 import CameraTiles from './components/CameraTiles.jsx';
 import FramePanel from './components/FramePanel.jsx';
-import ShotsPanel from './components/ShotsPanel.jsx';
+import ShotPad from './components/ShotPad.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { statusOf } from './components/status.js';
 import VideoView from './components/VideoView.jsx';
@@ -204,7 +204,7 @@ function ControlView({ state, trackBox, onError }) {
                 )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
                 <StepLabel number={1} title="Pick a camera" />
                 <CameraTiles
                     cameras={cameras}
@@ -219,7 +219,7 @@ function ControlView({ state, trackBox, onError }) {
             </div>
 
             <div className="grid grid-cols-[auto_minmax(0,1fr)] items-stretch gap-4">
-                <div className="flex flex-col gap-2 rounded-2xl border border-edge bg-panel p-4">
+                <div className="flex flex-col gap-2 rounded-2xl border border-edge bg-panel p-4" data-testid="frame-panel">
                     <div className="flex items-center gap-3">
                         <StepLabel number={2} title={`Frame ${selected.name}`} />
                         {live && (
@@ -244,7 +244,12 @@ function ControlView({ state, trackBox, onError }) {
                     />
                 </div>
 
-                <div className="rounded-2xl border border-edge bg-panel p-4">
+                {/* The joystick panel alone sets this row's height; the shots
+                    fill the same height and scroll inside, so any number of
+                    cameras or shots never stretches the row or leaves a gap
+                    beside the joystick. */}
+                <div className="relative min-h-[220px] rounded-2xl border border-edge bg-panel">
+                    <div className="absolute inset-0 overflow-y-auto p-4">
                     {exposureOpen ? (
                         <ExposurePanel
                             camera={selected}
@@ -254,8 +259,19 @@ function ControlView({ state, trackBox, onError }) {
                             onError={onError}
                         />
                     ) : (
-                        <ShotsPanel cameras={cameras} selectedId={selected.id} onlineIds={onlineIds} live={atem.live} next={atem.next} onError={onError} />
+                        <ShotPad
+                            cameras={cameras}
+                            selectedId={selected.id}
+                            onlineIds={onlineIds}
+                            live={atem.live}
+                            next={atem.next}
+                            tracking={tracking}
+                            appTracking={state.appTracking ?? {}}
+                            onShot={state.onShot ?? {}}
+                            onError={onError}
+                        />
                     )}
+                    </div>
                 </div>
             </div>
         </div>

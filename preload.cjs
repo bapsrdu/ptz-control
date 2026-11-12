@@ -72,4 +72,5 @@ contextBridge.exposeInMainWorld('ptz', {
     recallPreset: invoke('preset:recall'),
     renamePreset: invoke('preset:rename'),
     deletePreset: invoke('preset:delete'),
+    movePreset: invoke('preset:move'),
 });
