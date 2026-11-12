@@ -57,6 +57,10 @@ contextBridge.exposeInMainWorld('ptz', {
     focusMode: invoke('ptz:focusMode'),
     tracking: invoke('ptz:tracking'),
     trackingSettings: invoke('ptz:trackingSettings'),
+    // App tracking (phase 7)
+    appTracking: invoke('track:app'),
+    trackObserve: send('track:observe'),
+    trackUnavailable: send('track:unavailable'),
     openWebPage: invoke('tools:openWebPage'),
     exposure: invoke('ptz:exposure'),
     readExposure: invoke('ptz:readExposure'),

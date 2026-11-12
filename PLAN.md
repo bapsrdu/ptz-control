@@ -397,24 +397,34 @@ Not built, and why:
 - A camera web login other than admin/admin: add username and password fields
   (password in Electron `safeStorage`) if a temple changes it.
 
-### Phase 7 (optional): app-side tracking
+### Phase 7: app-side tracking (built)
 
-Only build this if the camera's tracking proves not good enough in real
-services.
+- **Person detection** in the window with Google MediaPipe Pose
+  (`@mediapipe/pose`, Apache 2.0). Its code and the lite and full models
+  (about 24 MB) are copied into `dist-renderer/mediapipe` at build time and
+  served as `ptz-asset://mediapipe/`, so it works with no internet. It needs
+  WebGL; a computer without graphics acceleration gets a plain message.
+- The window looks at the tracked camera's preview about 10 times a second
+  and sends the key body points (nose, shoulders, hips, ankles) to the main
+  process. It draws a box around the person on the large view.
+- **Framing controller** (`src/main/tracking/framing.js`): keeps the body
+  centred and puts the top of the head and a bottom line where the framing
+  wants them: Close (to the chest), Waist (to the hips), Full (to the feet).
+  Zooms only while the person is roughly centred. Separate start and stop
+  thresholds stop the camera twitching. Tested with a simulated camera and
+  0.4 s of video delay: it follows a walking presenter and settles without
+  swinging back and forth.
+- Speeds go through the same movement path as the joystick (10 messages a
+  second at most, Stop on loss, 1.5 s watchdog).
+- One camera at a time. Turning app tracking on turns the camera's own
+  tracking off, and the other way round. Moving the camera by hand hands
+  over, with a message.
+- Tracking row: Off / Camera / App, then Presenter-Zone-Headroom for Camera
+  or Close-Waist-Full for App. App tracking works with any camera that has
+  video, not just BZB.
 
-- Run a person-detection model on the preview stream inside the app. Good
-  open options: Google MediaPipe Pose Landmarker (Apache 2.0, runs in the
-  window with no extra install) or a YOLO pose model through ONNX Runtime.
-  Check the YOLO model's licence before shipping it.
-- Steer with VISCA move commands from a simple control loop: keep the chosen
-  body point at a target place in the frame, with a dead zone in the middle so
-  the camera does not twitch.
-- Close / Waist / Full sets how much of the frame the person's height should
-  fill, and the loop zooms to match.
-- The camera's own tracking must be off on a camera while the app is tracking
-  it.
-- Expect several services' worth of tuning. The sub stream is small and has
-  delay, so this will react more slowly than the camera's own tracker.
+Needs checking on site: real presenters (only made-up body positions and an
+empty test picture were used here), how quickly it reacts, and CPU use.
 
 ### Phase 8: packaging and hand-out (built)
 

@@ -126,6 +126,23 @@ On the controls:
       which: ______
 - [ ] Zone mode: **Set up zones** opens the camera's page in a window.
 
+## Check 6: app tracking (phase 7)
+
+- [ ] Choose a camera, Tracking: **App**. Within a few seconds a box appears
+      around the presenter on the large view and it says Following.
+- [ ] Waist: the presenter walks across the stage. The camera follows and
+      keeps them framed from the waist up, without swinging back and forth.
+- [ ] Close and Full: the framing changes to head and shoulders, then the
+      whole person.
+- [ ] The presenter leaves the stage: the camera stops and it says Looking for
+      the presenter. They come back: it picks them up again.
+- [ ] Grab the joystick while it is tracking: app tracking turns off with a
+      message.
+- [ ] Several people on stage: note who it follows: ______
+- [ ] Task Manager while tracking: CPU ____ %, GPU ____ %. Smooth? ____
+- [ ] Compare with the camera's own tracking (Tracking: Camera). Which works
+      better at the temple? ______
+
 ### Results
 
 - Raleigh: the Test button found a BG-ADAMO-4KND25X on port 1259 using UDP,

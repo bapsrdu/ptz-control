@@ -8,7 +8,7 @@ import { useDrive } from '../useDrive.js';
 const SPEED_DEFAULT = 0.5;
 
 // Step 2: everything for framing the selected camera.
-export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, trackingSettings = null, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
+export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, trackingSettings = null, appTracking = null, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
     const [focusMode, setFocusMode] = useState({}); // cameraId -> 'auto' | 'manual'
     const [localSpeed, setLocalSpeed] = useState(speed);
 
@@ -39,6 +39,20 @@ export default function FramePanel({ camera, profile, online, power = null, live
     }
 
     const standby = power === 'standby';
+    // Which tracker steers this camera: none, the camera's own, or this app.
+    const trackingKind = appTracking ? 'app' : trackingOn ? 'camera' : 'off';
+    const [lastFraming, setLastFraming] = useState('waist');
+    useEffect(() => {
+        if (appTracking?.framing) setLastFraming(appTracking.framing);
+    }, [appTracking?.framing]);
+
+    async function chooseTracking(kind) {
+        if (kind === trackingKind) return;
+        if (kind === 'camera') return run(window.ptz.tracking(camera.id, true));
+        if (kind === 'app') return run(window.ptz.appTracking(camera.id, { on: true, framing: lastFraming }));
+        if (trackingKind === 'app') return run(window.ptz.appTracking(camera.id, { on: false }));
+        return run(window.ptz.tracking(camera.id, false));
+    }
     const disabled = !online || standby;
 
     async function setPower(on) {
@@ -75,64 +89,98 @@ export default function FramePanel({ camera, profile, online, power = null, live
                         </div>
                     )}
 
-                    {profile?.features.tracking && (
+                    <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                             <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Tracking</span>
-                            <button
-                                type="button"
-                                disabled={disabled}
-                                aria-pressed={trackingOn}
-                                className={`${pill(trackingOn)} flex items-center gap-1.5`}
-                                onClick={() => run(window.ptz.tracking(camera.id, !trackingOn))}
-                            >
-                                <PersonStanding size={16} /> {trackingOn ? 'On' : 'Off'}
-                            </button>
-                            {profile.features.trackingSettings && (
-                                <>
-                                    <div className="flex overflow-hidden rounded-lg" role="group" aria-label="Tracking mode">
-                                        {[['presenter', 'Presenter'], ['zone', 'Zone']].map(([value, label]) => (
-                                            <button
-                                                key={value}
-                                                type="button"
-                                                disabled={disabled || !trackingSettings}
-                                                aria-pressed={trackingSettings?.mode === value}
-                                                title={value === 'presenter' ? 'Follows the presenter everywhere' : 'Moves only between the zones set up on the camera'}
-                                                className={`${pill(trackingSettings?.mode === value)} rounded-none`}
-                                                onClick={() => run(window.ptz.trackingSettings(camera.id, { mode: value }))}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {trackingSettings?.mode === 'zone' ? (
-                                        <button
-                                            type="button"
-                                            disabled={!online}
-                                            title="Zones are set up on the camera's own web page"
-                                            className={pill(false)}
-                                            onClick={() => run(window.ptz.openWebPage(camera.id))}
-                                        >
-                                            Set up zones
-                                        </button>
-                                    ) : (
-                                        <select
-                                            aria-label="Headroom"
-                                            title="How much space to leave above the presenter's head"
-                                            disabled={disabled || !trackingSettings}
-                                            value={trackingSettings?.headroom ?? ''}
-                                            onChange={(e) => run(window.ptz.trackingSettings(camera.id, { headroom: e.target.value }))}
-                                            className="rounded-lg border border-edge bg-panel-2 px-2 py-1.5 text-sm text-zinc-200 disabled:opacity-40"
-                                        >
-                                            {!trackingSettings?.headroom && <option value="">Headroom</option>}
-                                            <option value="low">Headroom: low</option>
-                                            <option value="medium">Headroom: medium</option>
-                                            <option value="high">Headroom: high</option>
-                                        </select>
-                                    )}
-                                </>
+                            <div className="flex overflow-hidden rounded-lg" role="group" aria-label="Tracking">
+                                {[
+                                    ['off', 'Off', 'No tracking'],
+                                    ...(profile?.features.tracking ? [['camera', 'Camera', "The camera's own built-in tracking"]] : []),
+                                    ['app', 'App', 'This app finds the person in the video and steers the camera'],
+                                ].map(([value, label, title]) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        disabled={disabled}
+                                        title={title}
+                                        aria-pressed={trackingKind === value}
+                                        className={`${pill(trackingKind === value)} flex items-center gap-1.5 rounded-none`}
+                                        onClick={() => chooseTracking(value)}
+                                    >
+                                        {value !== 'off' && <PersonStanding size={15} />} {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {trackingKind === 'app' && (
+                                <span data-testid="app-tracking-status" className="text-xs text-zinc-400">
+                                    {appTracking?.status === 'following' ? 'Following' : 'Looking for the presenter...'}
+                                </span>
                             )}
                         </div>
-                    )}
+                        {trackingKind === 'camera' && profile?.features.trackingSettings && (
+                            <div className="flex items-center gap-2 pl-[4.5rem]">
+                                <div className="flex overflow-hidden rounded-lg" role="group" aria-label="Tracking mode">
+                                    {[['presenter', 'Presenter'], ['zone', 'Zone']].map(([value, label]) => (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            disabled={disabled || !trackingSettings}
+                                            aria-pressed={trackingSettings?.mode === value}
+                                            title={value === 'presenter' ? 'Follows the presenter everywhere' : 'Moves only between the zones set up on the camera'}
+                                            className={`${pill(trackingSettings?.mode === value)} rounded-none`}
+                                            onClick={() => run(window.ptz.trackingSettings(camera.id, { mode: value }))}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {trackingSettings?.mode === 'zone' ? (
+                                    <button
+                                        type="button"
+                                        disabled={!online}
+                                        title="Zones are set up on the camera's own web page"
+                                        className={pill(false)}
+                                        onClick={() => run(window.ptz.openWebPage(camera.id))}
+                                    >
+                                        Set up zones
+                                    </button>
+                                ) : (
+                                    <select
+                                        aria-label="Headroom"
+                                        title="How much space to leave above the presenter's head"
+                                        disabled={disabled || !trackingSettings}
+                                        value={trackingSettings?.headroom ?? ''}
+                                        onChange={(e) => run(window.ptz.trackingSettings(camera.id, { headroom: e.target.value }))}
+                                        className="rounded-lg border border-edge bg-panel-2 px-2 py-1.5 text-sm text-zinc-200 disabled:opacity-40"
+                                    >
+                                        {!trackingSettings?.headroom && <option value="">Headroom</option>}
+                                        <option value="low">Headroom: low</option>
+                                        <option value="medium">Headroom: medium</option>
+                                        <option value="high">Headroom: high</option>
+                                    </select>
+                                )}
+                            </div>
+                        )}
+                        {trackingKind === 'app' && (
+                            <div className="flex items-center gap-2 pl-[4.5rem]">
+                                <div className="flex overflow-hidden rounded-lg" role="group" aria-label="Framing">
+                                    {[['close', 'Close'], ['waist', 'Waist'], ['full', 'Full']].map(([value, label]) => (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            disabled={disabled}
+                                            aria-pressed={appTracking?.framing === value}
+                                            title={{ close: 'Head and shoulders', waist: 'From the waist up', full: 'The whole person' }[value]}
+                                            className={`${pill(appTracking?.framing === value)} rounded-none`}
+                                            onClick={() => run(window.ptz.appTracking(camera.id, { on: true, framing: value }))}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-2">
                         <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Picture</span>

@@ -59,6 +59,24 @@ export function sliderToZoom(value, { speedScale, zoomSpeedMax }) {
     };
 }
 
+// App tracking: pan/tilt -1..1 straight to VISCA speeds (no stick curve; the
+// framing controller already chose the speed). Null means hold still.
+export function autoToDrive({ pan = 0, tilt = 0 }, { panSpeedMax, tiltSpeedMax }) {
+    if (!pan && !tilt) return null;
+    const speed = (v, max) => Math.max(1, Math.round(Math.min(1, Math.abs(v)) * max));
+    return {
+        panDir: !pan ? PAN.NONE : pan < 0 ? PAN.LEFT : PAN.RIGHT,
+        tiltDir: !tilt ? TILT.NONE : tilt > 0 ? TILT.UP : TILT.DOWN,
+        panSpeed: pan ? speed(pan, panSpeedMax) : 1,
+        tiltSpeed: tilt ? speed(tilt, tiltSpeedMax) : 1,
+    };
+}
+
+export function autoToZoom(zoom, { zoomSpeedMax }) {
+    if (!zoom) return null;
+    return { dir: zoom > 0 ? 'tele' : 'wide', speed: Math.round(Math.min(1, Math.abs(zoom)) * zoomSpeedMax) };
+}
+
 export function sameDrive(a, b) {
     if (a === b) return true;
     if (!a || !b) return false;

@@ -7,6 +7,7 @@ import SettingsView from './components/SettingsView.jsx';
 import { statusOf } from './components/status.js';
 import VideoView from './components/VideoView.jsx';
 import logo from './assets/logo.png';
+import { useAppTracker } from './useAppTracker.js';
 import LiveView from './components/LiveView.jsx';
 import LowerThirdsButton from './components/LowerThirdsButton.jsx';
 import ExposurePanel from './components/ExposurePanel.jsx';
@@ -34,6 +35,9 @@ export default function App() {
             offNotice();
         };
     }, [showError]);
+
+    // Runs whichever view is open, so app tracking keeps going in Settings.
+    const trackBox = useAppTracker(state?.appTracking);
 
     if (!state) return null;
 
@@ -71,7 +75,7 @@ export default function App() {
                 ) : state.settings.cameras.length === 0 ? (
                     <Welcome onAdd={() => setView({ name: 'settings', adding: true })} onError={showError} />
                 ) : (
-                    <ControlView state={state} onError={showError} />
+                    <ControlView state={state} trackBox={trackBox} onError={showError} />
                 )}
             </main>
 
@@ -148,7 +152,7 @@ function Fit({ children }) {
     );
 }
 
-function ControlView({ state, onError }) {
+function ControlView({ state, trackBox, onError }) {
     const { settings, statuses, tracking, profiles, video, atem } = state;
     const withAtem = Boolean(settings.atem.host);
     const [exposureOpen, setExposureOpen] = useState(false);
@@ -165,6 +169,19 @@ function ControlView({ state, onError }) {
     const selectedView = (
         <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-accent" data-testid="selected-view">
             <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
+            {trackBox?.cameraId === selected.id && (
+                // The box around the person app tracking is following.
+                <div
+                    data-testid="track-box"
+                    className="pointer-events-none absolute rounded border-2 border-white/80 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+                    style={{
+                        left: `${Math.max(0, trackBox.box.x0) * 100}%`,
+                        top: `${Math.max(0, trackBox.box.y0) * 100}%`,
+                        width: `${(Math.min(1, trackBox.box.x1) - Math.max(0, trackBox.box.x0)) * 100}%`,
+                        height: `${(Math.min(1, trackBox.box.y1) - Math.max(0, trackBox.box.y0)) * 100}%`,
+                    }}
+                />
+            )}
             <span className="absolute left-3 top-3 rounded bg-accent px-2 py-0.5 text-xs font-bold tracking-wide text-zinc-900">SELECTED</span>
             <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm">
                 <span className={`h-2 w-2 rounded-full ${status.dot}`} />
@@ -193,7 +210,7 @@ function ControlView({ state, onError }) {
                     cameras={cameras}
                     statuses={statuses}
                     video={video}
-                    tracking={tracking}
+                    tracking={{ ...tracking, ...Object.fromEntries(Object.keys(state.appTracking ?? {}).map((id) => [id, true])) }}
                     selectedId={selected.id}
                     live={atem.live}
                     next={atem.next}
@@ -217,6 +234,7 @@ function ControlView({ state, onError }) {
                         online={status.state === 'online'}
                         trackingOn={Boolean(tracking[selected.id])}
                         trackingSettings={state.trackingSettings?.[selected.id] ?? null}
+                        appTracking={state.appTracking?.[selected.id] ?? null}
                         power={statuses[selected.id]?.power ?? null}
                         live={live}
                         exposureOpen={exposureOpen}

@@ -96,3 +96,13 @@ test('the dead zone sends nothing while already stopped, and the next move goes 
     ch.update(null);
     assert.deepEqual(sent, [4, 'stop']);
 });
+
+test('app tracking speeds map straight to VISCA speeds', async () => {
+    const { autoToDrive, autoToZoom } = await import('../src/main/cameras/motion.js');
+    const lim = { panSpeedMax: 0x18, tiltSpeedMax: 0x14 };
+    assert.equal(autoToDrive({ pan: 0, tilt: 0 }, lim), null);
+    assert.deepEqual(autoToDrive({ pan: 0.5, tilt: 0 }, lim), { panDir: PAN.RIGHT, tiltDir: TILT.NONE, panSpeed: 12, tiltSpeed: 1 });
+    assert.deepEqual(autoToDrive({ pan: -0.01, tilt: -1 }, lim), { panDir: PAN.LEFT, tiltDir: TILT.DOWN, panSpeed: 1, tiltSpeed: 0x14 });
+    assert.equal(autoToZoom(0, { zoomSpeedMax: 7 }), null);
+    assert.deepEqual(autoToZoom(-0.5, { zoomSpeedMax: 7 }), { dir: 'wide', speed: 4 });
+});

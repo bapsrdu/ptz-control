@@ -38,7 +38,7 @@ test('tracking mode and headroom follow the camera, and can be changed', async (
     await page.setViewportSize({ width: 1280, height: 900 });
 
     // The app shows what the camera reports, not a guess.
-    await page.getByRole('button', { name: 'On', exact: true }).waitFor({ timeout: 10000 });
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'Camera', pressed: true }).waitFor({ timeout: 10000 });
     await page.getByRole('group', { name: 'Tracking mode' }).getByRole('button', { name: 'Presenter', pressed: true }).waitFor();
     await until(async () => (await page.getByLabel('Headroom').inputValue()) === 'medium', 'headroom medium');
     assert.equal(web.loggedIn, true, 'logged in with the default login when asked');
@@ -65,5 +65,5 @@ test('tracking mode and headroom follow the camera, and can be changed', async (
 
     // Someone turns tracking off with the remote: the app notices within 10 seconds.
     web.tracking.bEnable = 0;
-    await page.getByRole('button', { name: 'Off', exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'Off', pressed: true }).waitFor({ timeout: 15000 });
 });

@@ -11,7 +11,7 @@ works at any temple with any number of cameras.
 **To install it**, download the installer for your computer from the
 project's Releases page and follow [docs/SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
-The full plan is in [PLAN.md](PLAN.md). Phases 1 to 5 are built: adding
+The full plan is in [PLAN.md](PLAN.md). All phases (1 to 8) are built: adding
 cameras, moving them, saved shots, live video from each camera, the optional
 ATEM link, exposure and white balance, camera power, and turning auto
 tracking off when someone takes over.
@@ -38,9 +38,13 @@ Picture: **Exposure** (next to the joystick) opens the exposure and white
 balance controls for the selected camera. **Standby** puts a camera to sleep;
 **Wake up** brings it back. Settings has Wake all and Standby all.
 
-Auto tracking: if a camera is tracking and someone moves it, zooms it, or
-sends it to a shot, tracking turns off by itself so the camera does not fight
-the operator.
+Tracking: **Off / Camera / App**. Camera uses the camera's own auto tracking
+(BZB: Presenter or Zone, and headroom). App makes this app find the person in
+the video and steer the camera, framed **Close**, **Waist** or **Full**; it
+works with any camera that has video, one camera at a time, and needs a
+computer with graphics acceleration. Either way, if someone moves the camera,
+zooms it or sends it to a shot, tracking turns off by itself so the camera
+does not fight the operator.
 
 Video: each camera's tile and the large view show its live video. For BZB
 cameras this is the camera's sub stream, `rtsp://<IP>:554/live/av1`, found
@@ -155,6 +159,7 @@ src/main/profiles/       Camera models (BZB ADAMO, generic VISCA)
 src/main/cameras/        One connection per camera; joystick rate limit and watchdog
 src/main/video/          RTSP client and H.264 unpacking for the video
 src/main/atem/           ATEM connection, LIVE/NEXT calculation, tally lights
+src/main/tracking/       App tracking: framing controller (Close, Waist, Full)
 src/main/store/          Settings file, rules for cameras and shots, shot pictures, backup
 src/main/tools/          Camera web page recorder (Settings, Record a camera's web page)
 frontend/src/            The window (React)

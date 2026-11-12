@@ -17,6 +17,7 @@ import { recordWebPage, countRecording } from './src/main/tools/web-recorder.js'
 import { AtemLink } from './src/main/atem/link.js';
 import { computeOnAir, keyerState } from './src/main/atem/tally.js';
 import { TallySync } from './src/main/atem/tally-sync.js';
+import { FramingController } from './src/main/tracking/framing.js';
 
 // Tests run the app against a pretend switcher.
 let createAtem;
@@ -56,7 +57,14 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 // Shot pictures are shown as <img src="ptz-shot://shots/<id>.jpg">.
-protocol.registerSchemesAsPrivileged([{ scheme: 'ptz-shot', privileges: { standard: true, secure: true } }]);
+// Person detection files (phase 7) are served as ptz-asset://mediapipe/<file>,
+// because the detector fetches them and Chromium will not fetch from file://.
+protocol.registerSchemesAsPrivileged([
+    { scheme: 'ptz-shot', privileges: { standard: true, secure: true } },
+    { scheme: 'ptz-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
+]);
+const ASSET_DIR = path.join(__dirname, 'dist-renderer', 'mediapipe');
+const ASSET_TYPES = { '.js': 'text/javascript', '.wasm': 'application/wasm', '.data': 'application/octet-stream', '.tflite': 'application/octet-stream', '.binarypb': 'application/octet-stream' };
 
 let win = null;
 const store = new S.SettingsStore(app.getPath('userData'));
@@ -65,6 +73,9 @@ const video = new VideoService();
 const atem = new AtemLink({ createAtem });
 const tracking = new Map(); // cameraId -> tracking on/off, from the camera when it can tell us
 const trackingSettings = new Map(); // cameraId -> { mode, headroom }
+// App tracking (phase 7): cameraId -> { framing, controller, status }. One
+// camera at a time, so the person detector does not overload the computer.
+const appTracking = new Map();
 // PTZ_WEB_PORT is for the tests, which cannot use port 80.
 const testWebPort = process.env.PTZ_WEB_PORT ? Number(process.env.PTZ_WEB_PORT) : null;
 const manager = new CameraManager({
@@ -78,6 +89,7 @@ function snapshot() {
         statuses: manager.statuses(),
         tracking: Object.fromEntries(tracking),
         trackingSettings: Object.fromEntries(trackingSettings),
+        appTracking: Object.fromEntries([...appTracking].map(([id, a]) => [id, { framing: a.framing, status: a.status }])),
         video: video.statuses(),
         atem: atemView,
         profiles: describeProfiles(),
@@ -148,6 +160,9 @@ store.on('change', (settings) => {
     }
     for (const id of trackingSettings.keys()) {
         if (!settings.cameras.some((c) => c.id === id)) trackingSettings.delete(id);
+    }
+    for (const id of appTracking.keys()) {
+        if (!settings.cameras.some((c) => c.id === id)) appTracking.delete(id);
     }
     pushState();
 });
@@ -260,7 +275,22 @@ ipcMain.handle('atem:lowerThirds', (_e, on) => atem.setKeyer(store.get().atem.lo
 // off first, so the camera does not fight the operator. The tracking command
 // is queued ahead of the movement.
 const TAKEOVER_DEAD_ZONE = 0.12;
+function notice(cameraId, kind, message) {
+    if (win && !win.isDestroyed()) win.webContents.send('notice', { cameraId, kind, message });
+}
+
+function stopAppTracking(id) {
+    if (!appTracking.has(id)) return;
+    appTracking.delete(id);
+    manager.autoStop(id);
+    pushState();
+}
+
 function takeOver(id) {
+    if (appTracking.has(id)) {
+        stopAppTracking(id);
+        notice(id, 'info', `App tracking turned off for ${camera(id)?.name ?? 'the camera'}, because you moved it.`);
+    }
     if (!tracking.get(id)) return;
     tracking.set(id, false);
     pushState();
@@ -335,6 +365,8 @@ ipcMain.handle('ptz:focusMode', (_e, id, mode) => {
 
 ipcMain.handle('ptz:tracking', async (_e, id, on) => {
     if (!camera(id)) return unknownCamera;
+    // The camera's own tracking and app tracking must not both steer.
+    if (on) stopAppTracking(id);
     const out = await manager.tracking(id, Boolean(on));
     if (out.ok) {
         tracking.set(id, Boolean(on));
@@ -344,6 +376,67 @@ ipcMain.handle('ptz:tracking', async (_e, id, on) => {
     }
     return out;
 });
+
+// App tracking on/off and framing. { on: true|false, framing: 'close'|'waist'|'full' }
+ipcMain.handle('track:app', async (_e, id, { on, framing } = {}) => {
+    const cam = camera(id);
+    if (!cam) return unknownCamera;
+    if (!on) {
+        stopAppTracking(id);
+        return { ok: true };
+    }
+    const existing = appTracking.get(id);
+    if (existing) {
+        if (framing) {
+            try { existing.controller.setFraming(framing); } catch { return { ok: false, message: 'Unknown framing.' }; }
+            existing.framing = framing;
+            pushState();
+        }
+        return { ok: true };
+    }
+    let controller;
+    try {
+        controller = new FramingController({ framing: framing || 'waist' });
+    } catch {
+        return { ok: false, message: 'Unknown framing.' };
+    }
+    for (const other of [...appTracking.keys()]) {
+        stopAppTracking(other);
+        notice(other, 'info', `App tracking moved from ${camera(other)?.name ?? 'another camera'} to ${cam.name}. It follows one camera at a time.`);
+    }
+    // Turn off the camera's own tracking so the two do not fight.
+    if (getProfile(cam.profile).features.tracking && tracking.get(id) !== false) {
+        await manager.tracking(id, false);
+        tracking.set(id, false);
+    }
+    appTracking.set(id, { framing: controller.framingName, controller, status: 'searching' });
+    pushState();
+    return { ok: true };
+});
+
+// Where the person is, from the window's detector, about 10 times a second.
+// points is null when nobody is in the picture.
+function onObservation(id, points) {
+    const entry = appTracking.get(id);
+    if (!entry) return;
+    const out = entry.controller.update(points && typeof points === 'object' ? points : null);
+    manager.autoDrive(id, out);
+    if (entry.status !== entry.controller.status) {
+        entry.status = entry.controller.status;
+        pushState();
+    }
+}
+ipcMain.on('track:observe', (_e, id, points) => onObservation(id, points));
+
+// The window could not run the detector (for example no WebGL).
+ipcMain.on('track:unavailable', (_e, id, message) => {
+    if (!appTracking.has(id)) return;
+    stopAppTracking(id);
+    notice(id, 'error', String(message || 'App tracking could not start.').slice(0, 300));
+});
+
+// Tests drive app tracking with made-up body positions.
+if (process.env.PTZ_TEST_HOOKS) globalThis.ptzTest = { observe: onObservation };
 
 ipcMain.handle('ptz:trackingSettings', async (_e, id, patch) => {
     if (!camera(id)) return unknownCamera;
@@ -526,6 +619,21 @@ app.whenReady().then(() => {
         const file = shotImages.file(name);
         if (!file) return new Response('Not found', { status: 404 });
         return net.fetch(pathToFileURL(file).toString());
+    });
+    protocol.handle('ptz-asset', async (request) => {
+        const url = new URL(request.url);
+        const name = path.basename(url.pathname);
+        const type = ASSET_TYPES[path.extname(name)];
+        // Only plain file names from the one folder.
+        if (url.hostname !== 'mediapipe' || !type || name !== decodeURIComponent(url.pathname).replace(/^\//, '')) {
+            return new Response('Not found', { status: 404 });
+        }
+        try {
+            const body = await fs.promises.readFile(path.join(ASSET_DIR, name));
+            return new Response(body, { headers: { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' } });
+        } catch {
+            return new Response('Not found', { status: 404 });
+        }
     });
     store.load();
     manager.sync(store.get().cameras);

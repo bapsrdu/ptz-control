@@ -115,3 +115,10 @@ export function snapshot(cameraId) {
     out.getContext('2d').drawImage(source, 0, 0, out.width, out.height);
     return out.toDataURL('image/jpeg', 0.8);
 }
+
+// A canvas showing this camera's current picture, for the person detector.
+export function canvasFor(cameraId) {
+    const cam = cameras.get(cameraId);
+    if (!cam?.hasPicture) return null;
+    return [...cam.canvases].find((c) => c.width > 0) ?? null;
+}

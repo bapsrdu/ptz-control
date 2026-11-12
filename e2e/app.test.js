@@ -145,8 +145,8 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     await waitForLog(fake, '81 01 04 3F 02 01 FF');
     await screenshot(page, '05-control-with-shot');
 
-    // Tracking toggle (BZB profile).
-    await page.getByRole('button', { name: 'Off' }).click();
+    // The camera's own tracking (BZB profile).
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'Camera' }).click();
     await waitForLog(fake, '81 0A 01 32 00 00 02 00 FF');
     assert.equal(fake.state.tracking, true);
 });

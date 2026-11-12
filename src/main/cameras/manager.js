@@ -10,7 +10,7 @@ import { ViscaClient } from '../visca/client.js';
 import { detectMode } from '../visca/detect.js';
 import * as V from '../visca/commands.js';
 import { getProfile } from '../profiles/index.js';
-import { DriveChannel, joystickToDrive, sliderToZoom } from './motion.js';
+import { DriveChannel, joystickToDrive, sliderToZoom, autoToDrive, autoToZoom } from './motion.js';
 import { BzbWeb } from './bzb-web.js';
 
 const DETECT_RETRY_MS = 10000;
@@ -338,6 +338,23 @@ export class CameraManager extends EventEmitter {
             bright: level(await ask('bright')),
         };
         return { ok: true, values };
+    }
+
+    // App tracking: speeds from the framing controller (-1..1 each).
+    autoDrive(id, { pan = 0, tilt = 0, zoom = 0 }) {
+        const entry = this.#entry(id);
+        if (!entry) return;
+        entry.channels.panTilt.update(autoToDrive({ pan, tilt }, {
+            panSpeedMax: entry.profile.panSpeedMax,
+            tiltSpeedMax: entry.profile.tiltSpeedMax,
+        }));
+        entry.channels.zoom.update(autoToZoom(zoom, { zoomSpeedMax: entry.profile.zoomSpeedMax }));
+    }
+
+    autoStop(id) {
+        const entry = this.#entry(id);
+        if (!entry) return Promise.resolve();
+        return Promise.all([entry.channels.panTilt.stop(), entry.channels.zoom.stop()]);
     }
 
     // Tracking mode and headroom, from the camera's web page interface.

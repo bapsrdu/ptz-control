@@ -25,7 +25,7 @@ test('packaged app: cameras, video, movement and ATEM all work', { skip: !execut
     }));
     const app = await electron.launch({
         executablePath,
-        args: ['--no-sandbox'],
+        args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
         env: { ...process.env, PTZ_USER_DATA: dir, PTZ_FAKE_ATEM: '1' },
     });
     t.after(async () => { await app.close(); await cam.stop(); await rtsp.stop(); });
@@ -62,4 +62,11 @@ test('packaged app: cameras, video, movement and ATEM all work', { skip: !execut
     assert.ok(cam.received.some((h) => h.startsWith('81 01 06 01') && h.endsWith('03 01 FF')), cam.received.join(' | '));
     const lastDrive = cam.received.findLastIndex((h) => h.startsWith('81 01 06 01') && !h.endsWith('03 03 FF'));
     assert.ok(cam.received.lastIndexOf('81 01 06 01 01 01 03 03 FF') > lastDrive, 'Stop must come after the last move');
+
+    // The person detector loads from inside the package.
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'App' }).click();
+    await page.getByTestId('app-tracking-status').waitFor();
+    await page.waitForTimeout(5000);
+    assert.equal(await page.getByRole('alert').count(), 0, 'no error from the person detector');
+    assert.equal(await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'App', pressed: true }).count(), 1);
 });

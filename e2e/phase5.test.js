@@ -38,7 +38,7 @@ test('tracking turns off when the operator moves the camera; exposure; standby a
     const [left] = cams;
 
     // --- Tracking hand-off ---------------------------------------------------
-    await page.getByRole('button', { name: 'Off', exact: true }).click();
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'Camera' }).click();
     await until(() => left.state.tracking, 'tracking on');
     left.clearLog();
     const pad = await page.getByTestId('joystick').boundingBox();
@@ -52,7 +52,7 @@ test('tracking turns off when the operator moves the camera; exposure; standby a
     assert.ok(trackingOff !== -1 && firstDrive !== -1 && trackingOff < firstDrive, `tracking off must come before moving:\n${left.received.join('\n')}`);
     assert.equal(left.state.tracking, false);
     await page.getByRole('status').getByText('Auto tracking turned off for Left').waitFor();
-    await page.getByRole('button', { name: 'Off', exact: true }).waitFor();
+    await page.getByRole('group', { name: 'Tracking', exact: true }).getByRole('button', { name: 'Off', pressed: true }).waitFor();
 
     // --- Exposure ------------------------------------------------------------
     await page.getByRole('button', { name: 'Exposure' }).click();
