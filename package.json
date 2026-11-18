@@ -1,7 +1,7 @@
 {
   "name": "universal-ptz-controller",
   "productName": "Universal PTZ Controller",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Universal PTZ Controller: simple PTZ camera control for temple AV volunteers",
   "main": "main.js",
   "type": "module",
