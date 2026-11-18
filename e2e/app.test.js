@@ -100,6 +100,8 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     await page.locator('[data-testid=camera-tile][data-state=online]').waitFor();
     await waitForPicture(page, page.getByTestId('selected-view').getByTestId('video-canvas'));
     await waitForPicture(page, page.getByTestId('camera-tile').getByTestId('video-canvas'));
+    // The large view shows the frame rate and size the camera is sending.
+    await page.getByTestId('selected-view').getByTestId('video-stats').filter({ hasText: /\d+ fps · \d+×\d+/ }).waitFor();
 
     // Drag the joystick right, hold, let go.
     fake.clearLog();
