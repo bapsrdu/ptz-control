@@ -233,6 +233,22 @@ export class FakeCamera extends EventEmitter {
             s.panTilt = { panDir, tiltDir, panSpeed, tiltSpeed };
             return done();
         }
+        // Absolute pan/tilt and zoom direct
+        if (is(0x01, 0x06, 0x02) && b.length === 15) {
+            const word = (i) => {
+                const v = ((b[i] & 0x0f) << 12) | ((b[i + 1] & 0x0f) << 8) | ((b[i + 2] & 0x0f) << 4) | (b[i + 3] & 0x0f);
+                return v >= 0x8000 ? v - 0x10000 : v;
+            };
+            s.pan = word(6);
+            s.tilt = word(10);
+            s.panTilt = { panDir: 3, tiltDir: 3, panSpeed: 0, tiltSpeed: 0 };
+            return done();
+        }
+        if (is(0x01, 0x04, 0x47) && b.length === 9) {
+            s.zoom = ((b[4] & 0x0f) << 12) | ((b[5] & 0x0f) << 8) | ((b[6] & 0x0f) << 4) | (b[7] & 0x0f);
+            return done();
+        }
+        if (is(0x01, 0x04, 0x18, 0x01) && b.length === 6) return done();
         // Home
         if (is(0x01, 0x06, 0x04) && b.length === 5) {
             s.pan = 0;

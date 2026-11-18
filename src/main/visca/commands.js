@@ -66,6 +66,27 @@ export function panTiltHome(address) {
 
 // --- Zoom -------------------------------------------------------------------
 
+// Absolute pan/tilt: 8x 01 06 02 VV WW 0Y0Y0Y0Y 0Z0Z0Z0Z FF. Positions are the
+// camera's own signed 16-bit counts, as the position inquiry reports them.
+export function panTiltAbsolute(address, { pan, tilt, panSpeed = 0x14, tiltSpeed = 0x12 }) {
+    const n = (v) => {
+        const w = Math.round(Number(v)) & 0xffff;
+        return [(w >> 12) & 0x0f, (w >> 8) & 0x0f, (w >> 4) & 0x0f, w & 0x0f];
+    };
+    return msg(address, 0x01, 0x06, 0x02, panSpeed, tiltSpeed, ...n(pan), ...n(tilt));
+}
+
+// Zoom direct: 8x 01 04 47 0p 0q 0r 0s FF.
+export function zoomDirect(address, zoom) {
+    const w = Math.max(0, Math.min(0xffff, Math.round(Number(zoom) || 0)));
+    return msg(address, 0x01, 0x04, 0x47, (w >> 12) & 0x0f, (w >> 8) & 0x0f, (w >> 4) & 0x0f, w & 0x0f);
+}
+
+// One-push auto focus: focus once now, then hold.
+export function focusOnePush(address) {
+    return msg(address, 0x01, 0x04, 0x18, 0x01);
+}
+
 export function zoomStop(address) {
     return msg(address, 0x01, 0x04, 0x07, 0x00);
 }

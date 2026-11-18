@@ -1,0 +1,50 @@
+{
+  "appId": "app.boothvideo",
+  "productName": "Booth Video",
+  "copyright": "Booth Video contributors",
+  "directories": {
+    "output": "release",
+    "buildResources": "booth/build"
+  },
+  "extraMetadata": {
+    "name": "booth-video",
+    "productName": "Booth Video",
+    "version": "1.0.0",
+    "main": "booth/main.js",
+    "description": "Booth Video: switch the ATEM and frame PTZ cameras from one screen"
+  },
+  "files": [
+    "booth/main.js",
+    "booth/config.js",
+    "booth/preload.cjs",
+    "booth/assets/**/*",
+    "package.json",
+    "src/**/*",
+    "dist-booth/**/*",
+    "NOTICE",
+    "sim/fake-atem.js"
+  ],
+  "asar": true,
+  "npmRebuild": false,
+  "mac": {
+    "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+    "category": "public.app-category.video",
+    "artifactName": "Booth-Video-${version}-mac-${arch}.${ext}"
+  },
+  "dmg": { "title": "Booth Video ${version}" },
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "artifactName": "Booth-Video-Setup-${version}.${ext}",
+    "icon": "booth/build/icon.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Booth Video",
+    "uninstallDisplayName": "Booth Video"
+  },
+  "linux": { "target": ["dir"], "category": "Video" }
+}

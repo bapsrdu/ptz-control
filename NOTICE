@@ -15,6 +15,14 @@ VISCA cameras and this app's design:
     (src/main/tools/finder.js)
   - keeping a last-good copy of the settings (src/main/store/settings.js)
 
+Booth Video (booth/) is a Windows and Mac app modelled on CueVideo's
+features: the Operate screen (Next and Live monitors, source row, shot grid,
+exposure, camera control, Fade / Cut / Black and key buttons, keyboard
+shortcuts), the full switcher page, routing, setup, status and command log,
+and the setup file kept as JSON with a last-good copy. It was written from
+scratch in JavaScript for VISCA cameras and RTSP preview video; no
+Churchfront code, name, logo or artwork is included.
+
 "Churchfront" is a trademark of Churchfront LLC. This app is not made by,
 endorsed by or connected with Churchfront LLC.
 

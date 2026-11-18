@@ -1,7 +1,8 @@
 name: Build installers
 
-# Builds the Windows installer and the Mac disk images on GitHub's own Windows
-# and Mac machines, so nobody needs a Mac or a Windows build PC.
+# Builds the Windows installers and the Mac disk images of both apps
+# (Universal PTZ Controller and Booth Video) on GitHub's own Windows and Mac
+# machines, so nobody needs a Mac or a Windows build PC.
 #
 # Ways to start it:
 #   - Publish a Release on GitHub (Releases, Draft a new release, new tag such
@@ -39,11 +40,23 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            app: universal-ptz-controller
             dist: dist:win
             files: |
               release/*.exe
           - os: macos-latest
+            app: universal-ptz-controller
             dist: dist:mac
+            files: |
+              release/*.dmg
+          - os: windows-latest
+            app: booth-video
+            dist: dist:booth:win
+            files: |
+              release/*.exe
+          - os: macos-latest
+            app: booth-video
+            dist: dist:booth:mac
             files: |
               release/*.dmg
     runs-on: ${{ matrix.os }}
@@ -71,7 +84,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ matrix.os }}
+          name: ${{ matrix.app }}-${{ matrix.os }}
           if-no-files-found: error
           retention-days: 30
           path: ${{ matrix.files }}

@@ -22,13 +22,14 @@ function linkKey(camera) {
 
 // Events: 'status' (cameraId, status), 'notice' (cameraId, message)
 export class CameraManager extends EventEmitter {
-    constructor({ onModeDetected = () => {}, clientOptions = {}, detectOptions = {}, driveOptions = {}, webPort = null } = {}) {
+    constructor({ onModeDetected = () => {}, clientOptions = {}, detectOptions = {}, driveOptions = {}, webPort = null, webLogin = null } = {}) {
         super();
         this.onModeDetected = onModeDetected;
         this.clientOptions = clientOptions;
         this.detectOptions = detectOptions;
         this.driveOptions = driveOptions;
         this.webPort = webPort; // tests point this at a fake camera web page
+        this.webLogin = webLogin; // () => { username, password } for the camera's web page, if not admin/admin
         this.entries = new Map(); // cameraId -> entry
     }
 
@@ -62,7 +63,7 @@ export class CameraManager extends EventEmitter {
             profile: getProfile(camera.profile),
             client: null,
             web: getProfile(camera.profile).features.trackingSettings
-                ? new BzbWeb({ host: camera.host, port: this.webPort ?? getProfile(camera.profile).webPort ?? 80 })
+                ? new BzbWeb({ host: camera.host, port: this.webPort ?? getProfile(camera.profile).webPort ?? 80, ...(this.webLogin?.() ?? {}) })
                 : null,
             detectTimer: null,
             disposed: false,
@@ -381,6 +382,40 @@ export class CameraManager extends EventEmitter {
         return { ok: true, refused };
     }
 
+    // Where the camera points now, in its own counts: { pan, tilt, zoom }.
+    async readPosition(id) {
+        const entry = this.#entry(id);
+        if (!entry?.client) return { ok: false, message: entry ? notReady(entry) : 'Unknown camera.' };
+        try {
+            const pt = await entry.client.inquiry(V.panTiltPositionInquiry(ADDRESS));
+            const z = await entry.client.inquiry(V.zoomPositionInquiry(ADDRESS));
+            if (!pt || pt.length < 8 || !z || z.length < 4) return { ok: false, message: 'The camera did not say where it is pointing.' };
+            const signed = (v) => (v >= 0x8000 ? v - 0x10000 : v);
+            return { ok: true, position: { pan: signed(V.decodeNibbles(pt, 0)), tilt: signed(V.decodeNibbles(pt, 4)), zoom: V.decodeNibbles(z, 0) } };
+        } catch (err) {
+            return { ok: false, message: err.message };
+        }
+    }
+
+    // Straight to a saved position.
+    async goTo(id, { pan, tilt, zoom }) {
+        const entry = this.#entry(id);
+        if (!entry) return { ok: false, message: 'Unknown camera.' };
+        entry.channels.panTilt.stop();
+        entry.channels.zoom.stop();
+        const a = await this.#send(entry, V.panTiltAbsolute(ADDRESS, {
+            pan, tilt, panSpeed: entry.profile.panSpeedMax, tiltSpeed: entry.profile.tiltSpeedMax,
+        }));
+        const b = await this.#send(entry, V.zoomDirect(ADDRESS, zoom));
+        return a.ok ? b : a;
+    }
+
+    async focusOnce(id) {
+        const entry = this.#entry(id);
+        if (!entry) return { ok: false, message: 'Unknown camera.' };
+        return this.#send(entry, V.focusOnePush(ADDRESS));
+    }
+
     // App tracking: speeds from the framing controller (-1..1 each).
     autoDrive(id, { pan = 0, tilt = 0, zoom = 0 }) {
         const entry = this.#entry(id);
@@ -389,7 +424,8 @@ export class CameraManager extends EventEmitter {
             panSpeedMax: entry.profile.panSpeedMax,
             tiltSpeedMax: entry.profile.tiltSpeedMax,
         }));
-        entry.channels.zoom.update(autoToZoom(zoom, { zoomSpeedMax: entry.profile.zoomSpeedMax }));
+        // zoom null: leave zoom alone (someone is zooming by hand).
+        if (zoom !== null) entry.channels.zoom.update(autoToZoom(zoom, { zoomSpeedMax: entry.profile.zoomSpeedMax }));
     }
 
     autoStop(id) {
