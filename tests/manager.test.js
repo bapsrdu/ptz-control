@@ -98,6 +98,7 @@ test('exposure changes, reading them back, and power', async (t) => {
     const read = await manager.readExposure('c1');
     assert.deepEqual(read.values, {
         aeMode: 'bright', expCompOn: false, expComp: 7, backlight: true, wbMode: '5500K', iris: 10, shutter: 8, bright: 13,
+        gain: 0, rGain: 128, bGain: 128,
     });
 
     assert.deepEqual(await manager.power('c1', false), { ok: true });
@@ -107,4 +108,34 @@ test('exposure changes, reading them back, and power', async (t) => {
     await manager.power('c1', true);
     await waitFor(() => manager.statuses().c1.power === 'on');
     assert.ok(fake.received.includes('81 01 04 00 03 FF') && fake.received.includes('81 01 04 00 02 FF'));
+});
+
+test('copying exposure and white balance to another camera', async (t) => {
+    const a = await new FakeCamera({ mode: 'udp-raw' }).start();
+    const b = await new FakeCamera({ mode: 'udp-raw' }).start();
+    const manager = new CameraManager(fast);
+    t.after(async () => { await manager.dispose(); await a.stop(); await b.stop(); });
+    manager.sync([
+        { id: 'a', name: 'Left', host: '127.0.0.1', port: a.port, profile: 'bzb-adamo', mode: 'udp-raw', presets: [] },
+        { id: 'b', name: 'Right', host: '127.0.0.1', port: b.port, profile: 'bzb-adamo', mode: 'udp-raw', presets: [] },
+    ]);
+    await waitFor(() => manager.statuses().a?.state === 'online' && manager.statuses().b?.state === 'online');
+    Object.assign(a.state, { ae: 0x03, iris: 14, shutter: 11, gain: 4, wb: 0x05, rGain: 150, bGain: 110, backlight: true });
+    const source = await manager.readExposure('a');
+    const out = await manager.applyExposure('b', source.values);
+    assert.deepEqual(out, { ok: true, refused: [] });
+    assert.equal(b.state.ae, 0x03);
+    assert.equal(b.state.iris, 14);
+    assert.equal(b.state.shutter, 11);
+    assert.equal(b.state.gain, 4);
+    assert.equal(b.state.wb, 0x05);
+    assert.equal(b.state.rGain, 150);
+    assert.equal(b.state.bGain, 110);
+    assert.equal(b.state.backlight, true);
+
+    // White balance only.
+    Object.assign(a.state, { wb: 0x09, ae: 0x00 });
+    await manager.applyExposure('b', (await manager.readExposure('a')).values, { exposure: false });
+    assert.equal(b.state.wb, 0x09);
+    assert.equal(b.state.ae, 0x03, 'exposure left alone');
 });

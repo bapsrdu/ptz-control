@@ -162,6 +162,23 @@ export function step(address, setting, dir) {
     return msg(address, 0x01, 0x04, STEP_CODES[setting], STEP_DIRS[dir]);
 }
 
+// Direct values (the "Direct" rows of the same tables), used to copy one
+// camera's settings to another: CAM_Iris/Shutter/Gain/Bright/ExpComp Direct
+// and CAM_RGain/BGain Direct, each 8x 01 04 cc 00 00 0p 0q FF.
+export const DIRECT_CODES = Object.freeze({ expComp: 0x4e, iris: 0x4b, shutter: 0x4a, gain: 0x4c, bright: 0x4d, rGain: 0x43, bGain: 0x44 });
+const DIRECT_MAX = Object.freeze({ expComp: 0x0e, iris: 0x1f, shutter: 0x1f, gain: 0x0f, bright: 0x1f, rGain: 0xff, bGain: 0xff });
+
+export function direct(address, setting, value) {
+    if (!(setting in DIRECT_CODES)) throw new RangeError(`Unknown setting ${setting}`);
+    const v = Math.round(Number(value));
+    if (!Number.isInteger(v) || v < 0 || v > DIRECT_MAX[setting]) throw new RangeError(`${setting} ${value} is out of range`);
+    return msg(address, 0x01, 0x04, DIRECT_CODES[setting], 0x00, 0x00, (v >> 4) & 0x0f, v & 0x0f);
+}
+
+export function clampDirect(setting, value) {
+    return Math.min(DIRECT_MAX[setting], Math.max(0, Math.round(Number(value) || 0)));
+}
+
 export function backlight(address, on) {
     return msg(address, 0x01, 0x04, 0x33, on ? 0x02 : 0x03);
 }
@@ -206,6 +223,9 @@ export const INQUIRIES = Object.freeze({
     iris: [0x04, 0x4b],
     shutter: [0x04, 0x4a],
     bright: [0x04, 0x4d],
+    gain: [0x04, 0x4c],
+    rGain: [0x04, 0x43],
+    bGain: [0x04, 0x44],
 });
 
 export function inquiry(address, name) {

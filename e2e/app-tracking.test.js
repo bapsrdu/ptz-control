@@ -91,6 +91,13 @@ test('app tracking: detector runs, the camera follows, and the operator can take
     await page.getByRole('group', { name: 'Framing' }).getByRole('button', { name: 'Close', pressed: true }).waitFor();
     if (shots) await page.screenshot({ path: path.join(shots, '15-app-tracking.png') });
 
+    // Click a person on the picture to follow them: the camera holds still and
+    // looks for them there.
+    await page.getByTestId('selected-view').click({ position: { x: 120, y: 120 } });
+    await page.getByTestId('track-pick').waitFor();
+    await page.getByTestId('app-tracking-status').getByText('Looking for the presenter').waitFor();
+    assert.deepEqual(errors, []);
+
     // The operator grabs the joystick: app tracking hands over.
     const pad = await page.getByTestId('joystick').boundingBox();
     await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);

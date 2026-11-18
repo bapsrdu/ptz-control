@@ -123,6 +123,9 @@ test('first run: add a camera, see its video, move it, save and recall a shot', 
     const lastDrive = fake.received.findLastIndex((h) => h.startsWith('81 01 06 01') && !h.endsWith('03 03 FF'));
     assert.ok(fake.received.lastIndexOf('81 01 06 01 01 01 03 03 FF') > lastDrive, 'Stop must come after the last move');
 
+    // The speed dial reads 1x by default.
+    await page.getByTestId('speed-dial').getByText('1×').waitFor();
+
     // Zoom lever: push up, let go.
     fake.clearLog();
     const lever = await page.getByTestId('zoom-slider').boundingBox();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Split } from 'lucide-react';
 import CameraTiles from './components/CameraTiles.jsx';
 import FramePanel from './components/FramePanel.jsx';
 import ShotPad from './components/ShotPad.jsx';
@@ -11,6 +11,9 @@ import { useAppTracker } from './useAppTracker.js';
 import LiveView from './components/LiveView.jsx';
 import LowerThirdsButton from './components/LowerThirdsButton.jsx';
 import ExposurePanel from './components/ExposurePanel.jsx';
+import RoutingView from './components/RoutingView.jsx';
+import RoutePanel from './components/RoutePanel.jsx';
+import MatchPanel from './components/MatchPanel.jsx';
 
 export default function App() {
     const [state, setState] = useState(null);
@@ -37,7 +40,7 @@ export default function App() {
     }, [showError]);
 
     // Runs whichever view is open, so app tracking keeps going in Settings.
-    const trackBox = useAppTracker(state?.appTracking);
+    const tracker = useAppTracker(state?.appTracking);
 
     if (!state) return null;
 
@@ -53,6 +56,15 @@ export default function App() {
                         {state.atem.status.state === 'connected' && state.settings.atem.lowerThirds && (
                             <LowerThirdsButton state={state.atem.lowerThirds} onError={showError} />
                         )}
+                        {state.settings.atem.host && (
+                            <button
+                                type="button"
+                                onClick={() => setView({ name: 'routing' })}
+                                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/10"
+                            >
+                                <Split size={16} /> Routing
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => setView({ name: 'settings' })}
@@ -65,7 +77,9 @@ export default function App() {
             </header>
 
             <main className="min-h-0 flex-1 overflow-auto">
-                {view.name === 'settings' ? (
+                {view.name === 'routing' ? (
+                    <RoutingView state={state} onBack={() => setView({ name: 'control' })} onError={showError} />
+                ) : view.name === 'settings' ? (
                     <SettingsView
                         state={state}
                         startAdding={view.adding}
@@ -75,7 +89,7 @@ export default function App() {
                 ) : state.settings.cameras.length === 0 ? (
                     <Welcome onAdd={() => setView({ name: 'settings', adding: true })} onError={showError} />
                 ) : (
-                    <ControlView state={state} trackBox={trackBox} onError={showError} />
+                    <ControlView state={state} tracker={tracker} onError={showError} onOpenRouting={() => setView({ name: 'routing' })} />
                 )}
             </main>
 
@@ -152,10 +166,13 @@ function Fit({ children }) {
     );
 }
 
-function ControlView({ state, trackBox, onError }) {
+function ControlView({ state, tracker, onError, onOpenRouting }) {
+    const [pad, setPad] = useState('shots'); // or 'screens'
+    const trackBox = tracker.overlay;
     const { settings, statuses, tracking, profiles, video, atem } = state;
     const withAtem = Boolean(settings.atem.host);
     const [exposureOpen, setExposureOpen] = useState(false);
+    const [matchOpen, setMatchOpen] = useState(false);
     const cameras = settings.cameras;
     const selected = cameras.find((c) => c.id === settings.ui.selectedCameraId) ?? cameras[0];
     const status = statusOf(statuses, selected.id);
@@ -166,20 +183,60 @@ function ControlView({ state, trackBox, onError }) {
     );
 
     const live = atem.live.includes(selected.id);
+    // With an ATEM, the box beside the joystick has two pages: the shots, and
+    // the routing buttons for the screens.
+    const padTabs = (
+        <div className="flex overflow-hidden rounded-md border border-edge" role="tablist" aria-label="Shots or screens">
+            {[['shots', 'Shots'], ['screens', 'Screens']].map(([value, text]) => (
+                <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={pad === value}
+                    onClick={() => setPad(value)}
+                    className={`px-3 py-1 text-xs font-semibold uppercase tracking-widest ${pad === value ? 'bg-white/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                    {text}
+                </button>
+            ))}
+        </div>
+    );
+    const appOn = Boolean(state.appTracking?.[selected.id]);
+    // With app tracking on, click a person on the picture to follow them.
+    function pickPerson(e) {
+        if (!appOn) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const point = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+        tracker.follow(selected.id, point);
+        window.ptz.trackRestart(selected.id);
+    }
     const selectedView = (
-        <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-accent" data-testid="selected-view">
+        <div
+            className={`relative h-full w-full overflow-hidden rounded-xl border-2 border-accent ${appOn ? 'cursor-crosshair' : ''}`}
+            data-testid="selected-view"
+            onClick={pickPerson}
+            title={appOn ? 'Click a person to follow them' : undefined}
+        >
             <VideoView key={selected.id} cameraId={selected.id} status={video?.[selected.id]} large />
-            {trackBox?.cameraId === selected.id && (
+            {trackBox?.cameraId === selected.id && trackBox.box && (
                 // The box around the person app tracking is following.
                 <div
                     data-testid="track-box"
-                    className="pointer-events-none absolute rounded border-2 border-white/80 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+                    className={`pointer-events-none absolute rounded border-2 shadow-[0_0_0_1px_rgba(0,0,0,0.4)] ${trackBox.chosen ? 'border-accent' : 'border-white/80'}`}
                     style={{
                         left: `${Math.max(0, trackBox.box.x0) * 100}%`,
                         top: `${Math.max(0, trackBox.box.y0) * 100}%`,
                         width: `${(Math.min(1, trackBox.box.x1) - Math.max(0, trackBox.box.x0)) * 100}%`,
                         height: `${(Math.min(1, trackBox.box.y1) - Math.max(0, trackBox.box.y0)) * 100}%`,
                     }}
+                />
+            )}
+            {trackBox?.cameraId === selected.id && !trackBox.box && trackBox.picked && (
+                // Where the operator clicked, until the person there is found.
+                <div
+                    data-testid="track-pick"
+                    className="pointer-events-none absolute h-10 w-10 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full border-2 border-accent"
+                    style={{ left: `${trackBox.picked.x * 100}%`, top: `${trackBox.picked.y * 100}%` }}
                 />
             )}
             <span className="absolute left-3 top-3 rounded bg-accent px-2 py-0.5 text-xs font-bold tracking-wide text-zinc-900">SELECTED</span>
@@ -238,7 +295,7 @@ function ControlView({ state, trackBox, onError }) {
                         power={statuses[selected.id]?.power ?? null}
                         live={live}
                         exposureOpen={exposureOpen}
-                        onToggleExposure={() => setExposureOpen((o) => !o)}
+                        onToggleExposure={() => { setExposureOpen((o) => !o); setMatchOpen(false); }}
                         speed={settings.ui.speed}
                         onError={onError}
                     />
@@ -250,16 +307,37 @@ function ControlView({ state, trackBox, onError }) {
                     beside the joystick. */}
                 <div className="relative min-h-[220px] rounded-2xl border border-edge bg-panel">
                     <div className="absolute inset-0 overflow-y-auto p-4">
-                    {exposureOpen ? (
+                    {exposureOpen && matchOpen ? (
+                        <MatchPanel
+                            key={selected.id}
+                            reference={selected}
+                            cameras={cameras}
+                            onlineIds={onlineIds}
+                            live={atem.live}
+                            onBack={() => setMatchOpen(false)}
+                            onClose={() => { setMatchOpen(false); setExposureOpen(false); }}
+                            onError={onError}
+                        />
+                    ) : exposureOpen ? (
                         <ExposurePanel
                             camera={selected}
                             live={live}
                             disabled={status.state !== 'online' || statuses[selected.id]?.power === 'standby'}
                             onClose={() => setExposureOpen(false)}
+                            onMatch={cameras.length > 1 ? () => setMatchOpen(true) : null}
                             onError={onError}
                         />
+                    ) : withAtem && pad === 'screens' ? (
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                                {padTabs}
+                                <button type="button" onClick={onOpenRouting} className="rounded-md border border-edge px-2.5 py-1 text-xs font-semibold text-zinc-400 hover:bg-white/10">Routing page</button>
+                            </div>
+                            <RoutePanel routing={settings.routing} summary={atem.status.state === 'connected' ? atem.summary : null} onOpenRouting={onOpenRouting} onError={onError} />
+                        </div>
                     ) : (
                         <ShotPad
+                            title={withAtem ? padTabs : null}
                             cameras={cameras}
                             selectedId={selected.id}
                             onlineIds={onlineIds}

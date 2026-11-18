@@ -87,6 +87,12 @@ export class FakeAtem extends EventEmitter {
         this.#changed(`video.downstreamKeyers.${key}.onAir`);
     }
 
+    async setAuxSource(source, bus = 0) {
+        this.writes.push(['aux', bus, source]);
+        this.state.video.auxilliaries[bus] = source;
+        this.#changed(`video.auxilliaries.${bus}`);
+    }
+
     async setUpstreamKeyerOnAir(onAir, me = 0, keyer = 0) {
         this.writes.push(['usk', me, keyer, onAir]);
         this.state.video.mixEffects[me].upstreamKeyers[keyer].onAir = onAir;

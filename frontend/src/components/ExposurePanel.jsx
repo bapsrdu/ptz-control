@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Minus, Plus, RotateCcw, SunMedium, X } from 'lucide-react';
+import { Minus, Plus, RotateCcw, SunMedium, Wand2, X } from 'lucide-react';
 
 const MODES = [
     { id: 'auto', label: 'Auto' },
@@ -27,7 +27,7 @@ const WB = [
 // Exposure and white balance for one camera. It reads the camera's current
 // settings when opened and after every change, so it always shows what the
 // camera is really doing.
-export default function ExposurePanel({ camera, live, disabled, onClose, onError }) {
+export default function ExposurePanel({ camera, live, disabled, onClose, onMatch = null, onError }) {
     const [values, setValues] = useState(null);
     const [busy, setBusy] = useState(false);
 
@@ -74,6 +74,11 @@ export default function ExposurePanel({ camera, live, disabled, onClose, onError
                 <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
                     <SunMedium size={14} /> Exposure · {camera.name}
                 </h2>
+                {onMatch && (
+                    <button type="button" onClick={onMatch} title={`Make the other cameras look like ${camera.name}`} className="ml-auto mr-1 flex items-center gap-1.5 rounded-md border border-edge px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-white/10">
+                        <Wand2 size={13} /> Match other cameras
+                    </button>
+                )}
                 <button type="button" aria-label="Close exposure" onClick={onClose} className="rounded-md p-1 text-zinc-400 hover:bg-white/10"><X size={16} /></button>
             </div>
             {live && <p className="text-xs text-red-300">{camera.name} is live: changes here show on screen straight away.</p>}

@@ -49,8 +49,9 @@ export default function AtemSettings({ atemSettings, atem, cameras, onError }) {
             <div>
                 <h2 className="font-semibold">ATEM switcher (optional)</h2>
                 <p className="mt-1 text-sm text-zinc-400">
-                    With an ATEM, the app shows which camera is LIVE and NEXT, lights the camera tally lights, asks before
-                    moving a live camera, and can turn the lower thirds on and off. It never switches cameras.
+                    With an ATEM, the app shows which camera is LIVE and NEXT, lights the camera tally lights, warns when
+                    you move a live camera, can turn the lower thirds on and off, and sends pictures to the screens
+                    (Routing). It never switches cameras on the program output.
                 </p>
             </div>
 

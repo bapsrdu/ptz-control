@@ -9,7 +9,7 @@ import { cameraColour } from './cameraColours.js';
 // The columns share the pad's width and never get narrower than MIN_COLUMN;
 // with more cameras than fit, the pad scrolls sideways inside itself, so a
 // temple with many cameras never pushes the rest of the screen around.
-export default function ShotPad({ cameras, selectedId, onlineIds, live = [], next = [], tracking = {}, appTracking = {}, onShot = {}, onError }) {
+export default function ShotPad({ title = null, cameras, selectedId, onlineIds, live = [], next = [], tracking = {}, appTracking = {}, onShot = {}, onError }) {
     const [editing, setEditing] = useState(false);
     const [adding, setAdding] = useState(null); // cameraId being named
     const [renaming, setRenaming] = useState(null); // presetId being renamed
@@ -69,7 +69,7 @@ export default function ShotPad({ cameras, selectedId, onlineIds, live = [], nex
     return (
         <div className="flex h-full min-h-0 flex-col gap-3" data-testid="shots-panel">
             <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Shots</h2>
+                {title ?? <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Shots</h2>}
                 <button
                     type="button"
                     onClick={() => { setEditing((e) => !e); setRenaming(null); setAdding(null); }}

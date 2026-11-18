@@ -11,16 +11,19 @@ works at any temple with any number of cameras.
 **To install it**, download the installer for your computer from the
 project's Releases page and follow [docs/SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
-The full plan is in [PLAN.md](PLAN.md). All phases (1 to 8) are built: adding
-cameras, moving them, saved shots, live video from each camera, the optional
-ATEM link, exposure and white balance, camera power, and turning auto
-tracking off when someone takes over.
+The full plan is in [PLAN.md](PLAN.md). All phases (1 to 9) are built: adding
+cameras (or finding them on the network), moving them, saved shots, live video
+from each camera, the optional ATEM link with screen routing, exposure and
+white balance with camera matching, camera power, the camera's own tracking
+and this app's tracking.
 
 ## Using it
 
-1. Open **Cameras** (top right) and choose **Add a camera**.
+1. Open **Settings** (top right) and choose **Add a camera**, or press
+   **Find** under "Find cameras on the network" and **Add** next to each
+   camera it finds.
 2. Enter a name, the camera's IP address, and the port if it is not the
-   default (1259 for BZB cameras).
+   default (1259 for BZB cameras). A found camera has these filled in.
 3. Press **Test connection**. The app works out how the camera wants to be
    spoken to and remembers it. You can also save without testing; the app keeps
    looking for the camera in the background.
@@ -29,20 +32,25 @@ tracking off when someone takes over.
      it moves. Let go and it stops.
    - push the zoom lever up to zoom in, down to zoom out. It springs back and
      stops when you let go.
-   - use the speed slider (turtle to rabbit) to set the top speed.
-   - press **+** in the Shots panel to save where a camera is pointing, and
-     click a shot to send the camera back there. The shot button shows a
-     small picture of what the camera saw.
+   - use the speed dial (turtle to rabbit, 0.25x to 2x) to set the speed.
+   - press **Save shot** in a camera's column to save where it is pointing,
+     and click a shot to send the camera back there.
 
 Picture: **Exposure** (next to the joystick) opens the exposure and white
-balance controls for the selected camera. **Standby** puts a camera to sleep;
+balance controls for the selected camera. **Match other cameras** there makes
+the other cameras look like it: **Copy settings** sends its exposure and
+white balance to them, and **Fine-tune from the pictures** compares the videos
+and adjusts the others step by step (point them at the same scene first). **Standby** puts a camera to sleep;
 **Wake up** brings it back. Settings has Wake all and Standby all.
 
 Tracking: **Off / Camera / App**. Camera uses the camera's own auto tracking
 (BZB: Presenter or Zone, and headroom). App makes this app find the person in
 the video and steer the camera, framed **Close**, **Waist** or **Full**; it
 works with any camera that has video, one camera at a time, and needs a
-computer with graphics acceleration. Either way, if someone moves the camera,
+computer with graphics acceleration. It frames like a camera operator: eyes
+on the upper third, space in front of a person walking, no chasing small
+moves, and slow, calm zooms. With App on, click a person on the large view to
+follow that person. Either way, if someone moves the camera,
 zooms it or sends it to a shot, tracking turns off by itself so the camera
 does not fight the operator.
 
@@ -56,8 +64,14 @@ With an ATEM switcher (optional, set up under **Settings**): tiles show which
 camera is LIVE and which is NEXT, a Live view shows what is on air, the
 cameras' tally lights follow the switcher, a red note warns when the camera
 you are moving is live, and a **Lower thirds** button turns
-the lower-thirds key on and off. The app never switches cameras; that stays on
-the ATEM.
+the lower-thirds key on and off. **Routing** (top right) names the screens
+fed by the aux outputs, changes what each one shows, and saves routing
+buttons; the **Screens** tab beside the joystick has those buttons for the
+operator. The app never switches cameras on the program output; that stays
+on the ATEM.
+
+Settings are saved with a safety copy. If the settings file is ever damaged,
+the app loads the last good copy and says so.
 
 Safety: every camera is told to stop whenever the app window loses focus, the
 window stops responding, or the app closes. A held control also has to keep
@@ -67,6 +81,13 @@ Backup: Settings, Backup, **Save settings to a file** keeps every camera,
 shot (with its picture) and ATEM setting in one file. **Load settings from a
 file** (also offered on the welcome screen) sets up another computer the same
 way.
+
+## Credits
+
+Several features are adapted from Churchfront's open-source CueVideo (Apache
+2.0): the tracking framing rules, routing, camera matching, the network
+finder and the settings safety copy. See [NOTICE](NOTICE). This app is not
+made by or connected with Churchfront.
 
 ## Building the installers
 

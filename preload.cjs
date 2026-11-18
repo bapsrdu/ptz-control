@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('ptz', {
     removeCamera: invoke('camera:remove'),
     moveCamera: invoke('camera:move'),
     testCamera: invoke('camera:test'),
+    // Cameras and ATEM switchers on the local network
+    findDevices: invoke('tools:findDevices'),
 
     // ATEM: setAtem({ host, port, watched, lowerThirds, tally })
     setAtem: invoke('atem:set'),
@@ -57,13 +59,29 @@ contextBridge.exposeInMainWorld('ptz', {
     focusMode: invoke('ptz:focusMode'),
     tracking: invoke('ptz:tracking'),
     trackingSettings: invoke('ptz:trackingSettings'),
+    // Routing: aux outputs to screens
+    routing: {
+        mixName: invoke('routing:mixName'),
+        saveScreen: invoke('routing:saveScreen'),
+        removeScreen: invoke('routing:removeScreen'),
+        addButton: invoke('routing:addButton'),
+        renameButton: invoke('routing:renameButton'),
+        moveButton: invoke('routing:moveButton'),
+        removeButton: invoke('routing:removeButton'),
+        route: invoke('routing:route'),
+        run: invoke('routing:run'),
+    },
     // App tracking (phase 7)
     appTracking: invoke('track:app'),
     trackObserve: send('track:observe'),
     trackUnavailable: send('track:unavailable'),
+    // The operator clicked a person to follow: start looking afresh.
+    trackRestart: send('track:restart'),
     openWebPage: invoke('tools:openWebPage'),
     exposure: invoke('ptz:exposure'),
     readExposure: invoke('ptz:readExposure'),
+    // Copy exposure / white balance: matchExposure(fromId, [toIds], { exposure, whiteBalance })
+    matchExposure: invoke('ptz:matchExposure'),
     power: invoke('ptz:power'),
     powerAll: invoke('ptz:powerAll'),
 

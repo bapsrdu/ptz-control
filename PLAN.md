@@ -1,4 +1,4 @@
-# Universal Universal PTZ Controllerler: build plan
+# Universal PTZ Controller: build plan
 
 A desktop app (Windows and Mac) that lets one volunteer frame and recall shots
 on a temple's PTZ cameras from a single screen. It is built first for BAPS
@@ -445,14 +445,58 @@ empty test picture were used here), how quickly it reacts, and CPU use.
 - Camera web page recorder (Settings), a stand-in for Chrome's HAR export
   that also captures WebSocket messages. Its file feeds phase 6.
 
+### Phase 9: ideas from Churchfront's CueVideo (built)
+
+Churchfront published CueVideo, the app in the demo video this plan started
+from, as open source (Apache 2.0). It is a Mac-only Swift app for Canon
+cameras, so nothing was copied over directly; these features were rewritten
+in JavaScript for this app and VISCA cameras. Credit is in `NOTICE`.
+
+- **Tracking rules** (`src/main/tracking/framing.js`): eyes on the upper
+  third line; shot size measured from the eyes to the shoulders; lead room on
+  the side the person faces or walks towards; a dead zone the person can move
+  in before the camera moves; moves that ease in; harder correction near the
+  edge; calm zoom (only after the size has been wrong for 1.5 s, a 2 s rest
+  after each zoom, no reversing within 5 s). Status: Following, "Lost them,
+  looking", Lost.
+- **Click a person to follow**: with app tracking on, click someone on the
+  large view. The detector then looks only in a region around that person,
+  moved with them, so someone else on stage does not take over.
+- **Speed dial**: 0.25x to 2x (1x is the old default).
+- **Settings safety copy**: `settings.last-good.json`. A damaged settings file
+  is kept aside and the last good copy is loaded, with a message.
+- **Routing** (header: Routing; `src/main/store/routing.js`): what each M/E
+  is for, screens named from aux outputs (several outputs can switch
+  together), a source picker for each screen that changes the switcher at
+  once, "Encoders and feeds" for outputs operators do not need, and operator
+  routing buttons (saved from the current routing, lit while the switcher
+  matches, run, rename, reorder, remove). On the main screen the box beside
+  the joystick has a **Screens** tab with the buttons and what each screen
+  shows. The ATEM writes are now the lower-thirds key and aux outputs; still
+  never program, preview or transitions.
+- **Match cameras** (Exposure, Match other cameras): measures every camera's
+  picture (brightness, colour cast, clipping); **Copy settings** sends the
+  selected camera's exposure and/or white balance to the others (VISCA direct
+  values); **Fine-tune from the pictures** nudges each camera's red and blue
+  gain and brightness a step at a time until the pictures match.
+- **Find cameras on the network** (Settings): asks every address on the local
+  networks with a VISCA inquiry (UDP 1259, UDP 52381, TCP 5678) and the ATEM
+  hello (UDP 9910). Found cameras can be added with one click; a found ATEM
+  can be used at once.
+
+Left out for now: stage scan (needs the camera to report where it points),
+NDI previews, the Claude connection.
+
+Needs checking on site: see on-site check 7.
+
 ## 8. Rules for the builder
 
 - No address, port, input number or camera count from section 3 may appear in
   the code. Everything site-specific comes from settings.
 - Never send a move command without a matching Stop path. A camera left
   panning during a service is the worst failure this app can have.
-- The app must never change what is on air. The only ATEM write is the
-  lower-third key on/off.
+- The app must never change what is on the program output. The only ATEM
+  writes are the lower-third key on/off and aux output sources (Routing).
 - The ATEM is the source of truth for what is live.
 - Do not add steps that block moving a live camera; operators asked for
   warnings only. Do not keep a separate
