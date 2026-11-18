@@ -12,7 +12,9 @@ export const DEAD_ZONE = 0.12;
 export const MIN_INTERVAL_MS = 100; // at most 10 drive messages per second
 export const WATCHDOG_MS = 1500; // the window refreshes every 400 ms while held
 
-export const SPEED_MIN = 0.1;
+// The speed scale: 1 is the camera's top speed. The window shows it as a
+// speed dial from 0.25x to 2x, where 1x (the default) is half the top speed.
+export const SPEED_MIN = 0.125;
 export const SPEED_MAX = 1;
 export const SPEED_DEFAULT = 0.5;
 

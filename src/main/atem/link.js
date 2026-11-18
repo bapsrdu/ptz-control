@@ -1,6 +1,7 @@
-// The connection to the ATEM switcher. Read-only except for one thing: the
-// lower-thirds key on/off (PLAN.md section 8). It never changes program,
-// preview or transitions.
+// The connection to the ATEM switcher. It changes only two things: the
+// lower-thirds key on/off (PLAN.md section 8), and which source goes to each
+// aux output (the Routing page and the operator's routing buttons). It never
+// changes program, preview or transitions.
 //
 // Events: 'status' ({ state, message, model }), 'change' ()
 
@@ -159,7 +160,37 @@ export class AtemLink extends EventEmitter {
             })),
             dskCount: caps.downstreamKeyers ?? state.video.downstreamKeyers.length,
             uskCounts: Array.from({ length: meCount }, (_, me) => state.info?.mixEffects?.[me]?.keyCount ?? 4),
+            // For routing: the source on each aux output, what can be sent to
+            // an aux, and what each M/E has live and next.
+            aux: Array.from({ length: auxCount }, (_, i) => {
+                const v = state.video.auxilliaries?.[i];
+                return Number.isInteger(v) ? v : null;
+            }),
+            auxSources: Object.values(state.inputs ?? {})
+                .filter((i) => i && i.internalPortType !== Enums.InternalPortType.Auxiliary
+                    && i.internalPortType !== Enums.InternalPortType.AudioMonitor
+                    && (i.sourceAvailability === undefined || (i.sourceAvailability & Enums.SourceAvailability.Auxiliary)))
+                .map((i) => ({ id: i.inputId, name: i.longName || `Source ${i.inputId}`, kind: i.internalPortType === Enums.InternalPortType.MEOutput ? 'mix' : 'input' }))
+                .sort((a, b) => a.id - b.id),
+            mixes: Array.from({ length: meCount }, (_, me) => ({
+                live: state.video.mixEffects?.[me]?.programInput ?? null,
+                next: state.video.mixEffects?.[me]?.previewInput ?? null,
+            })),
         };
+    }
+
+    // Sends sources to aux outputs: [{ aux (from 0), source }].
+    async setAux(changes) {
+        if (!this.connected) return { ok: false, message: 'The ATEM is not connected.' };
+        const auxCount = this.atem.state?.info?.capabilities?.auxilliaries ?? this.atem.state?.video?.auxilliaries?.length ?? 0;
+        const list = (Array.isArray(changes) ? changes : []).filter((c) => Number.isInteger(c?.aux) && c.aux >= 0 && c.aux < auxCount && Number.isInteger(c?.source));
+        if (!list.length) return { ok: false, message: 'This switcher does not have those outputs.' };
+        try {
+            for (const c of list) await this.atem.setAuxSource(c.source, c.aux);
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, message: `The ATEM did not accept that: ${err?.message || err}` };
+        }
     }
 
     // The only thing this app changes on the ATEM.

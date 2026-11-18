@@ -5,7 +5,9 @@ import ZoomSlider from './ZoomSlider.jsx';
 import HoldButton from './HoldButton.jsx';
 import { useDrive } from '../useDrive.js';
 
-const SPEED_DEFAULT = 0.5;
+const SPEED_DEFAULT = 0.5; // shown as 1x
+const DIAL_MIN = 0.25;
+const DIAL_MAX = 2;
 
 // Step 2: everything for framing the selected camera.
 export default function FramePanel({ camera, profile, online, power = null, live = false, trackingOn, trackingSettings = null, appTracking = null, speed, exposureOpen = false, onToggleExposure = () => {}, onError }) {
@@ -113,7 +115,11 @@ export default function FramePanel({ camera, profile, online, power = null, live
                             </div>
                             {trackingKind === 'app' && (
                                 <span data-testid="app-tracking-status" className="text-xs text-zinc-400">
-                                    {appTracking?.status === 'following' ? 'Following' : 'Looking for the presenter...'}
+                                    {{
+                                        following: 'Following',
+                                        searching: 'Lost them, looking...',
+                                        lost: 'Lost them. Click them on the picture to follow again.',
+                                    }[appTracking?.status] ?? 'Looking for the presenter... (or click a person on the picture)'}
                                 </span>
                             )}
                         </div>
@@ -202,18 +208,20 @@ export default function FramePanel({ camera, profile, online, power = null, live
                     <div className="flex items-center gap-2">
                         <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">Speed</span>
                         <Turtle size={18} className="text-zinc-400" />
+                        {/* Speed dial: 1x is the usual speed, 0.25x for slow,
+                            careful moves during a service, 2x the camera's top speed. */}
                         <input
                             type="range"
                             aria-label="Movement speed"
-                            min={0.1}
-                            max={1}
+                            min={DIAL_MIN}
+                            max={DIAL_MAX}
                             step={0.05}
-                            value={localSpeed}
-                            onChange={(e) => setLocalSpeed(Number(e.target.value))}
+                            value={localSpeed * 2}
+                            onChange={(e) => setLocalSpeed(Number(e.target.value) / 2)}
                             className="w-32 accent-sky-300"
                         />
                         <Rabbit size={18} className="text-zinc-400" />
-                        <span className="w-10 text-right text-sm tabular-nums text-zinc-300">{Math.round(localSpeed * 100)}%</span>
+                        <span data-testid="speed-dial" className="w-11 text-right font-mono text-sm tabular-nums text-zinc-300">{(localSpeed * 2).toFixed(localSpeed * 2 < 1 ? 2 : 1).replace(/0$/, '').replace(/\.$/, '')}×</span>
                         <button type="button" className="text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setLocalSpeed(SPEED_DEFAULT)}>Reset</button>
                     </div>
                 </div>

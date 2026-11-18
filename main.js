@@ -14,10 +14,12 @@ import { ShotImages } from './src/main/store/shot-images.js';
 import { migrateOldSettings, OLD_APP_FOLDER } from './src/main/store/migrate.js';
 import { buildBackup, readBackup, replaceSettings } from './src/main/store/backup.js';
 import { recordWebPage, countRecording } from './src/main/tools/web-recorder.js';
+import { findDevices } from './src/main/tools/finder.js';
 import { AtemLink } from './src/main/atem/link.js';
 import { computeOnAir, keyerState } from './src/main/atem/tally.js';
 import { TallySync } from './src/main/atem/tally-sync.js';
 import { FramingController } from './src/main/tracking/framing.js';
+import * as R from './src/main/store/routing.js';
 
 // Tests run the app against a pretend switcher.
 let createAtem;
@@ -277,8 +279,30 @@ ipcMain.handle('ui:set', (_e, patch) => store.apply(S.setUi, patch ?? {}));
 
 ipcMain.handle('atem:set', (_e, patch) => store.apply(S.setAtem, patch ?? {}));
 
-// The one write this app makes to the ATEM.
+// The lower-thirds key on/off.
 ipcMain.handle('atem:lowerThirds', (_e, on) => atem.setKeyer(store.get().atem.lowerThirds, Boolean(on)));
+
+// --- Routing: which source goes to each aux output ----------------------------
+
+const auxNow = () => atemSummary?.aux ?? [];
+const routingOut = (out) => (out.ok ? out : { ...out, message: out.message || Object.values(out.errors ?? {})[0] });
+ipcMain.handle('routing:mixName', (_e, me, name) => routingOut(store.apply(R.setMixName, me, name)));
+ipcMain.handle('routing:saveScreen', (_e, input) => routingOut(store.apply(R.saveScreen, input ?? {})));
+ipcMain.handle('routing:removeScreen', (_e, id) => routingOut(store.apply(R.removeScreen, id)));
+ipcMain.handle('routing:addButton', (_e, input) => routingOut(store.apply(R.addRouteButton, input ?? {}, auxNow())));
+ipcMain.handle('routing:renameButton', (_e, id, label) => routingOut(store.apply(R.renameRouteButton, id, label)));
+ipcMain.handle('routing:moveButton', (_e, id, delta) => routingOut(store.apply(R.moveRouteButton, id, delta)));
+ipcMain.handle('routing:removeButton', (_e, id) => routingOut(store.apply(R.removeRouteButton, id)));
+// Sends one source to every aux output of a screen (or one aux output).
+ipcMain.handle('routing:route', (_e, aux, source) => {
+    const list = Array.isArray(aux) ? aux : [aux];
+    return atem.setAux(list.map((a) => ({ aux: Number(a), source: Number(source) })));
+});
+ipcMain.handle('routing:run', (_e, id) => {
+    const button = store.get().routing.buttons.find((b) => b.id === id);
+    if (!button) return { ok: false, message: 'This button no longer exists.' };
+    return atem.setAux(button.set);
+});
 
 // --- Movement ---------------------------------------------------------------
 
@@ -360,6 +384,25 @@ ipcMain.handle('ptz:home', (_e, id) => {
 ipcMain.handle('ptz:exposure', (_e, id, action) => (camera(id) ? manager.exposure(id, action) : unknownCamera));
 ipcMain.handle('ptz:readExposure', (_e, id) => (camera(id) ? manager.readExposure(id) : unknownCamera));
 
+// Exposure matching: copy one camera's exposure and/or white balance to
+// others. Returns { ok, results: [{ id, name, ok, message, refused }] }.
+ipcMain.handle('ptz:matchExposure', async (_e, fromId, toIds, what = {}) => {
+    const from = camera(fromId);
+    if (!from) return unknownCamera;
+    const source = await manager.readExposure(fromId);
+    if (!source.ok) return { ok: false, message: `Could not read ${from.name}: ${source.message}` };
+    const options = { exposure: what.exposure !== false, whiteBalance: what.whiteBalance !== false };
+    const results = [];
+    for (const id of Array.isArray(toIds) ? toIds : []) {
+        const cam = camera(id);
+        if (!cam || id === fromId) continue;
+        const out = await manager.applyExposure(id, source.values, options);
+        results.push({ id, name: cam.name, ok: out.ok, message: out.message ?? null, refused: out.refused ?? [] });
+    }
+    if (!results.length) return { ok: false, message: 'Choose at least one other camera.' };
+    return { ok: results.some((r) => r.ok), results, message: results.every((r) => !r.ok) ? results[0].message : undefined };
+});
+
 ipcMain.handle('ptz:power', (_e, id, on) => {
     if (!camera(id)) return unknownCamera;
     if (!on) {
@@ -433,7 +476,7 @@ ipcMain.handle('track:app', async (_e, id, { on, framing } = {}) => {
         await manager.tracking(id, false);
         tracking.set(id, false);
     }
-    appTracking.set(id, { framing: controller.framingName, controller, status: 'searching' });
+    appTracking.set(id, { framing: controller.framingName, controller, status: controller.status });
     pushState();
     return { ok: true };
 });
@@ -453,6 +496,17 @@ function onObservation(id, points) {
 }
 ipcMain.on('track:observe', (_e, id, points) => onObservation(id, points));
 
+// The operator clicked a person on the picture: hold still and frame them
+// from scratch once they are found.
+ipcMain.on('track:restart', (_e, id) => {
+    const entry = appTracking.get(id);
+    if (!entry) return;
+    manager.autoStop(id);
+    entry.controller.reset();
+    entry.status = entry.controller.status;
+    pushState();
+});
+
 // The window could not run the detector (for example no WebGL).
 ipcMain.on('track:unavailable', (_e, id, message) => {
     if (!appTracking.has(id)) return;
@@ -468,6 +522,38 @@ ipcMain.handle('ptz:trackingSettings', async (_e, id, patch) => {
     const out = await manager.setTrackingSettings(id, patch ?? {});
     if (out.ok) applyTracking(id, out.settings);
     return out;
+});
+
+// Finds cameras and ATEM switchers on the local networks. Tests narrow the
+// scan with PTZ_FINDER (JSON options for findDevices).
+let finding = null;
+ipcMain.handle('tools:findDevices', async () => {
+    if (!finding) {
+        let options = {};
+        if (process.env.PTZ_FINDER) {
+            try { options = JSON.parse(process.env.PTZ_FINDER); } catch {}
+        }
+        finding = findDevices(options).finally(() => { finding = null; });
+    }
+    try {
+        const out = await finding;
+        const settings = store.get();
+        if (!out.networks.length && !out.found.length && !process.env.PTZ_FINDER) {
+            return { ok: false, message: 'This computer is not on a network.' };
+        }
+        return {
+            ok: true,
+            networks: out.networks,
+            found: out.found.map((f) => ({
+                ...f,
+                added: f.kind === 'atem'
+                    ? settings.atem.host === f.host
+                    : settings.cameras.some((c) => c.host === f.host),
+            })),
+        };
+    } catch (err) {
+        return { ok: false, message: `The search did not work: ${err.message}` };
+    }
 });
 
 // The camera's own web page, for settings this app does not have (such as
@@ -640,6 +726,11 @@ function createWindow() {
     win.webContents.on('render-process-gone', () => manager.stopAll());
     win.webContents.on('did-start-navigation', () => manager.stopAll());
     win.on('closed', () => { win = null; });
+
+    if (store.recovered) {
+        const message = store.recovered;
+        win.webContents.once('did-finish-load', () => setTimeout(() => notice(null, 'error', message), 500));
+    }
 
     if (process.env.PTZ_DEV_URL) win.loadURL(process.env.PTZ_DEV_URL);
     else win.loadFile(path.join(__dirname, 'dist-renderer', 'index.html'));

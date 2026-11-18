@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Radar, Trash2 } from 'lucide-react';
 import { statusOf } from './status.js';
 import AtemSettings from './AtemSettings.jsx';
 import SupportSettings from './SupportSettings.jsx';
@@ -16,6 +16,10 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
     const { settings, statuses, profiles, video, atem } = state;
     // null = list, 'new' = adding, otherwise the id of the camera being edited
     const [form, setForm] = useState(startAdding ? 'new' : null);
+    // A camera found on the network, to fill in the add form.
+    const [found, setFound] = useState(null);
+    // The last network search, kept while the add form is open.
+    const [search, setSearch] = useState(null);
     const editing = settings.cameras.find((c) => c.id === form) ?? null;
 
     async function powerAll(on) {
@@ -46,10 +50,11 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                 <CameraForm
                     key={form}
                     camera={editing}
+                    found={form === 'new' ? found : null}
                     cameras={settings.cameras}
                     profiles={profiles}
                     atemSummary={atem.status.state === 'connected' ? atem.summary : null}
-                    onDone={() => setForm(null)}
+                    onDone={() => { setForm(null); setFound(null); }}
                 />
             ) : (
                 <>
@@ -97,12 +102,21 @@ export default function SettingsView({ state, startAdding, onBack, onError }) {
                     <div>
                         <button
                             type="button"
-                            onClick={() => setForm('new')}
+                            onClick={() => { setFound(null); setForm('new'); }}
                             className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-sky-200"
                         >
                             <Plus size={16} /> Add a camera
                         </button>
                     </div>
+                    <FindDevices
+                        result={search}
+                        setResult={setSearch}
+                        cameras={settings.cameras}
+                        atemHost={settings.atem.host}
+                        onAddCamera={(f) => { setFound(f); setForm('new'); }}
+                        onError={onError}
+                        onInfo={onInfo}
+                    />
                     {settings.cameras.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-edge bg-panel px-4 py-3" data-testid="power-all">
                             <span className="mr-auto text-sm text-zinc-300">All cameras</span>
@@ -142,12 +156,12 @@ function IconButton({ label, danger, children, ...rest }) {
     );
 }
 
-function CameraForm({ camera, cameras, profiles, atemSummary, onDone }) {
+function CameraForm({ camera, found = null, cameras, profiles, atemSummary, onDone }) {
     const [fields, setFields] = useState(() => ({
         name: camera?.name ?? `Camera ${cameras.length + 1}`,
-        profile: camera?.profile ?? profiles[0]?.id,
-        host: camera?.host ?? '',
-        port: camera ? String(camera.port) : '',
+        profile: camera?.profile ?? found?.profile ?? profiles[0]?.id,
+        host: camera?.host ?? found?.host ?? '',
+        port: camera ? String(camera.port) : found ? String(found.port) : '',
         previewUrl: camera?.previewUrl ?? '',
         atemInput: camera?.atemInput ? String(camera.atemInput) : '',
     }));
@@ -175,7 +189,9 @@ function CameraForm({ camera, cameras, profiles, atemSummary, onDone }) {
     async function save(e) {
         e.preventDefault();
         setSaving(true);
-        const input = { ...fields, mode: testMatches ? test.mode : undefined };
+        // A camera found on the network has already said how it wants to be spoken to.
+        const foundMatches = found && found.host === fields.host.trim() && found.port === portNumber;
+        const input = { ...fields, mode: testMatches ? test.mode : foundMatches ? found.mode : undefined };
         const out = camera ? await window.ptz.updateCamera(camera.id, input) : await window.ptz.addCamera(input);
         setSaving(false);
         if (out.ok) onDone();
@@ -273,5 +289,68 @@ function Field({ label, hint, error, children }) {
             {children}
             {error ? <span className="text-xs text-red-400">{error}</span> : hint && <span className="text-xs text-zinc-500">{hint}</span>}
         </label>
+    );
+}
+
+// Looks for cameras and ATEM switchers on this computer's network, so nobody
+// has to find their IP addresses first.
+function FindDevices({ result, setResult, cameras: added, atemHost, onAddCamera, onError, onInfo }) {
+    // result: null | { running } | the findDevices answer
+    async function find() {
+        setResult({ running: true });
+        const out = await window.ptz.findDevices();
+        if (!out?.ok) {
+            setResult(null);
+            onError(out?.message || 'The search did not work.');
+            return;
+        }
+        setResult(out);
+    }
+    async function chooseAtem(host) {
+        const out = await window.ptz.setAtem({ host });
+        if (out?.ok) onInfo(`Using the ATEM at ${host}.`);
+        else onError(Object.values(out?.errors ?? {})[0] ?? 'Could not set the ATEM.');
+    }
+    const cameras = result?.found?.filter((f) => f.kind === 'camera') ?? [];
+    const atems = result?.found?.filter((f) => f.kind === 'atem') ?? [];
+    const MODE = { 'udp-raw': 'UDP, plain VISCA', 'udp-sony': 'UDP with Sony header', 'tcp-raw': 'TCP, plain VISCA' };
+    return (
+        <div className="flex flex-col gap-3 rounded-xl border border-edge bg-panel px-4 py-3" data-testid="find-devices">
+            <div className="flex items-center gap-3">
+                <div className="mr-auto">
+                    <div className="text-sm font-semibold">Find cameras on the network</div>
+                    <div className="text-xs text-zinc-500">Looks for PTZ cameras and ATEM switchers on this computer's network. Nothing on them is changed.</div>
+                </div>
+                <button type="button" disabled={result?.running} onClick={find} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-panel-2 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-50">
+                    <Radar size={15} /> {result?.running ? 'Looking...' : result ? 'Look again' : 'Find'}
+                </button>
+            </div>
+            {result && !result.running && (
+                <>
+                    {result.networks?.length > 0 && <div className="text-xs text-zinc-500">Searched {result.networks.join(', ')}.</div>}
+                    {cameras.length === 0 && atems.length === 0 && (
+                        <p className="text-sm text-zinc-400">Nothing answered. Check the cameras are switched on and on the same network, and that VISCA over IP is turned on in their settings.</p>
+                    )}
+                    <ul className="flex flex-col gap-1.5">
+                        {[...cameras, ...atems].map((f) => (
+                            <li key={`${f.kind}-${f.host}`} data-testid="found-device" className="flex items-center gap-3 rounded-lg bg-black/30 px-3 py-2 text-sm">
+                                <span className={`rounded px-1.5 text-[10px] font-bold ${f.kind === 'atem' ? 'bg-amber-300 text-zinc-900' : 'bg-accent text-zinc-900'}`}>{f.kind === 'atem' ? 'ATEM' : 'CAMERA'}</span>
+                                <span className="font-semibold">{f.host}</span>
+                                <span className="truncate text-xs text-zinc-400">
+                                    {f.kind === 'camera' ? `${f.name ? `${f.name} · ` : ''}${MODE[f.mode] ?? f.mode}, port ${f.port}` : 'Blackmagic switcher'}
+                                </span>
+                                {(f.kind === 'atem' ? atemHost === f.host : added.some((c) => c.host === f.host && c.port === f.port)) ? (
+                                    <span className="ml-auto text-xs text-zinc-500">Already added</span>
+                                ) : f.kind === 'atem' ? (
+                                    <button type="button" onClick={() => chooseAtem(f.host)} className="ml-auto rounded-lg bg-panel-2 px-3 py-1 text-xs font-semibold hover:bg-white/10">Use this ATEM</button>
+                                ) : (
+                                    <button type="button" aria-label={`Add the camera at ${f.host}`} onClick={() => onAddCamera(f)} className="ml-auto rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-zinc-900 hover:bg-sky-200">Add</button>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </div>
     );
 }

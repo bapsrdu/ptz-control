@@ -1,0 +1,22 @@
+Universal PTZ Controller
+
+This app includes ideas and values adapted from Churchfront Video (CueVideo),
+https://github.com/Churchfront/churchfront-video
+Copyright 2026 Churchfront LLC, licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).
+
+The following were rewritten in JavaScript for this app, with changes for
+VISCA cameras and this app's design:
+  - the follow-shot framing rules and their numbers (src/main/tracking/framing.js)
+  - the routing page and operator routing buttons (src/main/store/routing.js,
+    frontend/src/components/RoutingView.jsx, RoutePanel.jsx)
+  - camera picture measurements for exposure matching (frontend/src/colourMatch.js)
+  - finding devices on the network, including the ATEM hello packet
+    (src/main/tools/finder.js)
+  - keeping a last-good copy of the settings (src/main/store/settings.js)
+
+"Churchfront" is a trademark of Churchfront LLC. This app is not made by,
+endorsed by or connected with Churchfront LLC.
+
+Person detection uses Google MediaPipe Pose (@mediapipe/pose),
+Copyright Google LLC, licensed under the Apache License, Version 2.0.

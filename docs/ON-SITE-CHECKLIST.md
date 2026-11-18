@@ -143,6 +143,27 @@ On the controls:
 - [ ] Compare with the camera's own tracking (Tracking: Camera). Which works
       better at the temple? ______
 
+## Check 7: features from CueVideo (phase 9)
+
+- [ ] App tracking, Waist: the presenter's eyes sit about a third of the way
+      down, not in the middle. Walking across, there is more space in front of
+      them than behind.
+- [ ] Standing and talking with small movements: the camera stays still.
+      Nodding or bending: no zooming in and out.
+- [ ] Two people on stage: click the one to follow. The box goes around them,
+      and stays with them when the other person walks past.
+- [ ] Speed dial: 0.25x is slow enough for a careful move during a service;
+      2x is the camera's top speed.
+- [ ] Settings, Find cameras on the network: all three BZB cameras and the
+      ATEM are listed. Note anything missing: ______
+- [ ] Routing: name the LED screens' aux outputs, change a source in the app
+      and check the screen changes. Save a button, change the screen another
+      way, press the button: it changes back and lights up.
+- [ ] Exposure, Match other cameras, Copy settings between two BZB cameras:
+      both pictures look the same. Note any setting the camera refused: ______
+- [ ] Fine-tune from the pictures with two cameras on the same scene: the
+      colour and brightness get closer each step. Note how many steps: ____
+
 ### Results
 
 - Raleigh: the Test button found a BG-ADAMO-4KND25X on port 1259 using UDP,

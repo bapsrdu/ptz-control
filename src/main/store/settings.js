@@ -15,6 +15,7 @@ import { EventEmitter } from 'node:events';
 import { PROFILES, DEFAULT_PROFILE_ID, getProfile } from '../profiles/index.js';
 import { MODES } from '../visca/transport.js';
 import { clampSpeed, SPEED_DEFAULT } from '../cameras/motion.js';
+import { defaultRouting, normalizeRouting } from './routing.js';
 
 export const SETTINGS_VERSION = 1;
 export const NAME_MAX = 40;
@@ -35,6 +36,7 @@ export function defaultSettings() {
         version: SETTINGS_VERSION,
         cameras: [],
         atem: defaultAtem(),
+        routing: defaultRouting(),
         ui: { speed: SPEED_DEFAULT, selectedCameraId: null },
     };
 }
@@ -149,6 +151,7 @@ export function normalizeSettings(raw) {
     }
     const atem = validateAtem(raw.atem ?? {});
     out.atem = atem.errors.host ? { ...atem.value, host: '' } : atem.value;
+    out.routing = normalizeRouting(raw.routing);
     const ui = raw.ui && typeof raw.ui === 'object' ? raw.ui : {};
     out.ui.speed = clampSpeed(ui.speed ?? SPEED_DEFAULT);
     out.ui.selectedCameraId = out.cameras.some((c) => c.id === ui.selectedCameraId)
@@ -368,22 +371,69 @@ export class SettingsStore extends EventEmitter {
     constructor(dir) {
         super();
         this.file = path.join(dir, 'settings.json');
+        // A copy of the last settings that loaded or saved cleanly. If the
+        // settings file is ever damaged (a crash, a bad edit, a full disk),
+        // the app starts from this instead of from nothing.
+        this.lastGood = path.join(dir, 'settings.last-good.json');
         this.settings = defaultSettings();
+        // Set when load() had to fall back: a message for the operator.
+        this.recovered = null;
     }
 
     load() {
-        try {
-            if (fs.existsSync(this.file)) {
-                this.settings = normalizeSettings(JSON.parse(fs.readFileSync(this.file, 'utf8')));
+        this.recovered = null;
+        if (!fs.existsSync(this.file)) {
+            // No settings yet; if only the safety copy survives, use it.
+            const copy = this.#readLastGood();
+            if (copy) {
+                this.settings = copy;
+                this.recovered = 'The settings file was missing, so the last good copy was loaded.';
+                this.#save();
             }
+            return this.settings;
+        }
+        try {
+            const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+            this.settings = normalizeSettings(raw);
+            this.#keepLastGood();
         } catch (err) {
-            // Keep the broken file so nothing is lost, and start empty.
+            // Keep the broken file so nothing is lost.
             const backup = `${this.file}.broken-${Date.now()}`;
             try { fs.copyFileSync(this.file, backup); } catch {}
             console.error(`Could not read ${this.file}; saved a copy as ${backup}.`, err);
-            this.settings = defaultSettings();
+            const copy = this.#readLastGood();
+            if (copy) {
+                this.settings = copy;
+                this.recovered = 'The settings file was damaged, so the last good copy was loaded. The damaged file was kept next to it.';
+                this.#save();
+            } else {
+                this.settings = defaultSettings();
+                this.recovered = 'The settings file was damaged and there was no good copy, so the app started empty. The damaged file was kept.';
+            }
         }
         return this.settings;
+    }
+
+    #readLastGood() {
+        try {
+            if (!fs.existsSync(this.lastGood)) return null;
+            return normalizeSettings(JSON.parse(fs.readFileSync(this.lastGood, 'utf8')));
+        } catch {
+            return null;
+        }
+    }
+
+    #keepLastGood() {
+        try {
+            const data = fs.readFileSync(this.file);
+            const old = fs.existsSync(this.lastGood) ? fs.readFileSync(this.lastGood) : null;
+            if (old && old.equals(data)) return;
+            const tmp = `${this.lastGood}.tmp`;
+            fs.writeFileSync(tmp, data);
+            fs.renameSync(tmp, this.lastGood);
+        } catch (err) {
+            console.error('Could not keep a safety copy of the settings.', err);
+        }
     }
 
     get() {
@@ -407,5 +457,6 @@ export class SettingsStore extends EventEmitter {
         const tmp = `${this.file}.tmp`;
         fs.writeFileSync(tmp, `${JSON.stringify(this.settings, null, 2)}\n`, 'utf8');
         fs.renameSync(tmp, this.file);
+        this.#keepLastGood();
     }
 }

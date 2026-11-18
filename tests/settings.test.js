@@ -106,9 +106,32 @@ test('store saves to disk and reloads', () => {
     store.apply(S.addCamera, { name: 'Left', host: '10.0.0.1' });
     const again = new S.SettingsStore(dir);
     assert.equal(again.load().cameras[0].name, 'Left');
+    // A damaged file: the last good copy is loaded and the operator is told.
     fs.writeFileSync(path.join(dir, 'settings.json'), '{ broken');
-    assert.deepEqual(new S.SettingsStore(dir).load().cameras, []);
+    const recovered = new S.SettingsStore(dir);
+    assert.equal(recovered.load().cameras[0].name, 'Left');
+    assert.match(recovered.recovered, /last good copy/);
     assert.ok(fs.readdirSync(dir).some((f) => f.includes('broken-')));
+    // ...and the settings file itself is repaired.
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')).cameras[0].name, 'Left');
+
+    // A missing file with a good copy beside it.
+    fs.unlinkSync(path.join(dir, 'settings.json'));
+    assert.equal(new S.SettingsStore(dir).load().cameras[0].name, 'Left');
+
+    // Both damaged: start empty, keep the damaged file.
+    fs.writeFileSync(path.join(dir, 'settings.json'), '{ broken');
+    fs.writeFileSync(path.join(dir, 'settings.last-good.json'), 'nope');
+    const empty = new S.SettingsStore(dir);
+    assert.deepEqual(empty.load().cameras, []);
+    assert.match(empty.recovered, /no good copy/);
+});
+
+test('a clean start has nothing to recover', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ptz-settings-'));
+    const store = new S.SettingsStore(dir);
+    store.load();
+    assert.equal(store.recovered, null);
 });
 
 test('ATEM settings: address, watched list, lower-thirds key, camera inputs', () => {

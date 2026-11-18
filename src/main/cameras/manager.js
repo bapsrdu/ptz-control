@@ -302,6 +302,7 @@ export class CameraManager extends EventEmitter {
                 case 'backlight': payload = V.backlight(ADDRESS, Boolean(action.value)); break;
                 case 'wbMode': payload = V.wbMode(ADDRESS, action.value); break;
                 case 'wbOnePushTrigger': payload = V.wbOnePushTrigger(ADDRESS); break;
+                case 'direct': payload = V.direct(ADDRESS, action.setting, action.value); break;
                 default: return { ok: false, message: 'Unknown exposure setting.' };
             }
         } catch (err) {
@@ -336,8 +337,48 @@ export class CameraManager extends EventEmitter {
             iris: level(await ask('iris')),
             shutter: level(await ask('shutter')),
             bright: level(await ask('bright')),
+            gain: level(await ask('gain')),
+            rGain: level(await ask('rGain')),
+            bGain: level(await ask('bGain')),
         };
         return { ok: true, values };
+    }
+
+    // Copies exposure and/or white balance (as read by readExposure from
+    // another camera) to this camera. Models differ, so each value is sent
+    // on its own and anything the camera refuses is listed, not fatal.
+    async applyExposure(id, values, { exposure = true, whiteBalance = true } = {}) {
+        const entry = this.#entry(id);
+        if (!entry?.client) return { ok: false, message: entry ? notReady(entry) : 'Unknown camera.' };
+        const steps = [];
+        const has = (v) => v !== null && v !== undefined;
+        if (exposure && values.aeMode) {
+            steps.push(['exposure mode', V.aeMode(ADDRESS, values.aeMode)]);
+            const manual = values.aeMode === 'manual';
+            if (has(values.iris) && (manual || values.aeMode === 'iris')) steps.push(['iris', V.direct(ADDRESS, 'iris', V.clampDirect('iris', values.iris))]);
+            if (has(values.shutter) && (manual || values.aeMode === 'shutter')) steps.push(['shutter', V.direct(ADDRESS, 'shutter', V.clampDirect('shutter', values.shutter))]);
+            if (has(values.gain) && manual) steps.push(['gain', V.direct(ADDRESS, 'gain', V.clampDirect('gain', values.gain))]);
+            if (has(values.bright) && values.aeMode === 'bright') steps.push(['brightness', V.direct(ADDRESS, 'bright', V.clampDirect('bright', values.bright))]);
+            if (has(values.expCompOn) && !manual) {
+                steps.push(['brighter/darker', V.expCompOn(ADDRESS, values.expCompOn)]);
+                if (values.expCompOn && has(values.expComp)) steps.push(['brighter/darker level', V.direct(ADDRESS, 'expComp', V.clampDirect('expComp', values.expComp))]);
+            }
+            if (has(values.backlight)) steps.push(['backlight', V.backlight(ADDRESS, values.backlight)]);
+        }
+        if (whiteBalance && values.wbMode && values.wbMode !== 'onePush') {
+            steps.push(['white balance', V.wbMode(ADDRESS, values.wbMode)]);
+            if (values.wbMode === 'manual') {
+                if (has(values.rGain)) steps.push(['red gain', V.direct(ADDRESS, 'rGain', V.clampDirect('rGain', values.rGain))]);
+                if (has(values.bGain)) steps.push(['blue gain', V.direct(ADDRESS, 'bGain', V.clampDirect('bGain', values.bGain))]);
+            }
+        }
+        const refused = [];
+        for (const [name, payload] of steps) {
+            const out = await this.#send(entry, payload);
+            if (!out.ok) refused.push(name);
+        }
+        if (refused.length === steps.length && steps.length) return { ok: false, message: `${entry.camera?.name ?? 'The camera'} did not accept the settings.` };
+        return { ok: true, refused };
     }
 
     // App tracking: speeds from the framing controller (-1..1 each).

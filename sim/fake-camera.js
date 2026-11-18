@@ -55,6 +55,9 @@ export class FakeCamera extends EventEmitter {
             iris: 10,
             shutter: 8,
             bright: 12,
+            gain: 0,
+            rGain: 128,
+            bGain: 128,
         };
         this.server = null;
         this.clients = new Set();
@@ -176,7 +179,7 @@ export class FakeCamera extends EventEmitter {
         if (is(0x09, 0x04, 0x3e) && b.length === 5) return [[0x90, 0x50, s.expCompOn ? 0x02 : 0x03, 0xff]];
         if (is(0x09, 0x04, 0x33) && b.length === 5) return [[0x90, 0x50, s.backlight ? 0x02 : 0x03, 0xff]];
         if (is(0x09, 0x04, 0x35) && b.length === 5) return [[0x90, 0x50, s.wb, 0xff]];
-        const levels = { 0x4e: 'expComp', 0x4b: 'iris', 0x4a: 'shutter', 0x4d: 'bright' };
+        const levels = { 0x4e: 'expComp', 0x4b: 'iris', 0x4a: 'shutter', 0x4d: 'bright', 0x4c: 'gain', 0x43: 'rGain', 0x44: 'bGain' };
         if (b[1] === 0x09 && b[2] === 0x04 && levels[b[3]] && b.length === 5) {
             const v = s[levels[b[3]]];
             return [[0x90, 0x50, 0x00, 0x00, (v >> 4) & 0x0f, v & 0x0f, 0xff]];
@@ -209,6 +212,11 @@ export class FakeCamera extends EventEmitter {
             if (b[4] === 0x00) s[key] = reset;
             if (b[4] === 0x02) s[key] = Math.min(max, s[key] + 1);
             if (b[4] === 0x03) s[key] = Math.max(0, s[key] - 1);
+            return done();
+        }
+        // Direct values: 8x 01 04 cc 00 00 0p 0q FF
+        if (b[1] === 0x01 && b[2] === 0x04 && levels[b[3]] && b.length === 9 && b[4] === 0 && b[5] === 0) {
+            s[levels[b[3]]] = ((b[6] & 0x0f) << 4) | (b[7] & 0x0f);
             return done();
         }
         if (is(0x01, 0x04, 0x35) && b.length === 6 && b[4] <= 0x0b) {
